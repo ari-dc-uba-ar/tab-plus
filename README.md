@@ -58,10 +58,17 @@ tabPlus.generateRow(['a', '', 'b'], {emptyField: 'null'});
 npm install tab-plus
 ```
 
+The library is written in TypeScript and ships its own type declarations (`dist/tab-plus.d.ts`); no `@types`
+package is needed.
+
 ## API
 
 ```js
 var tabPlus = require('tab-plus');
+```
+
+```ts
+import * as tabPlus from 'tab-plus';
 ```
 
 ### `tabPlus.parseTab(text, options)`
@@ -96,6 +103,11 @@ Generates a single raw line (without a line break) from an array of field values
 ### `tabPlus.escapeField(value, options)` / `tabPlus.unescapeField(rawValue, options)`
 
 Escape/unescape a single field's value.
+
+### Types
+
+The package exports the TypeScript types `FieldValue` (`string | null`), `Options` (`{emptyField?: 'string' |
+'null'}`) and `Tab` (`{fields: FieldValue[], rows: FieldValue[][]}`).
 
 ## License
 
