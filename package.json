@@ -1,0 +1,31 @@
+{
+  "name": "tab-plus",
+  "description": "parser and generator for the .tab file format used by backend-plus",
+  "version": "0.1.0",
+  "author": "Codenautas <codenautas@googlegroups.com>",
+  "license": "MIT",
+  "repository": "codenautas/tab-plus",
+  "contributors": [
+    {
+      "name": "Emilio Platzer",
+      "email": "emilioplatzer@gmail.com"
+    }
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "expect.js": "~0.3.1",
+    "mocha": "~11.7.6"
+  },
+  "main": "tab-plus.js",
+  "types": "tab-plus.d.ts",
+  "engines": {
+    "node": ">= 12"
+  },
+  "scripts": {
+    "test": "mocha --reporter spec --bail --check-leaks test/"
+  },
+  "files": [
+    "tab-plus.js",
+    "tab-plus.d.ts"
+  ]
+}
