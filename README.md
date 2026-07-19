@@ -3,6 +3,11 @@
 Parser and generator for the `.tab` file format used by [backend-plus](https://github.com/codenautas/backend-plus)
 to seed database tables with initial data.
 
+
+language: ![English](https://raw.githubusercontent.com/codenautas/multilang/master/img/lang-en.png)
+also available in:
+[![Spanish](https://raw.githubusercontent.com/codenautas/multilang/master/img/lang-es.png)](LEEME.md)
+
 ## The `.tab` format
 
 * Records are separated by lines (`\r\n` or `\n`).
