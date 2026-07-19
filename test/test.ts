@@ -147,6 +147,31 @@ describe('parseTab', function(){
     });
 });
 
+describe('objectRows option', function(){
+    it('parseTab returns rows as arrays by default', function(){
+        const tab = tabPlus.parseTab('a|b\r\n1|2\r\n');
+        expect(tab.rows).to.eql([['1', '2']]);
+    });
+    it('parseTab with objectRows: true returns rows as objects keyed by field name', function(){
+        const tab = tabPlus.parseTab('a|b\r\n1|2\r\n3|4\r\n', {objectRows: true});
+        expect(tab.fields).to.eql(['a', 'b']);
+        expect(tab.rows).to.eql([{a: '1', b: '2'}, {a: '3', b: '4'}]);
+    });
+    it('generateTab accepts object rows and generates the same output as array rows', function(){
+        const fromArrays = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2'], ['3', '4']]});
+        const fromObjects = tabPlus.generateTab({fields: ['a', 'b'], rows: [{a: '1', b: '2'}, {a: '3', b: '4'}]});
+        expect(fromObjects).to.eql(fromArrays);
+    });
+    it('round-trips through parseTab(objectRows:true)/generateTab', function(){
+        const tab = tabPlus.parseTab('a|b\r\n1|2\r\n3|4\r\n', {objectRows: true});
+        expect(tabPlus.parseTab(tabPlus.generateTab(tab), {objectRows: true})).to.eql(tab);
+    });
+    it('works together with emptyField', function(){
+        const tab = tabPlus.parseTab('a|b\r\n1|\r\n', {objectRows: true, emptyField: 'null'});
+        expect(tab.rows).to.eql([{a: '1', b: null}]);
+    });
+});
+
 describe('generateTab', function(){
     it('generates CRLF-separated lines with a trailing line ending', function(){
         const text = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2']]});

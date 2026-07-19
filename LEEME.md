@@ -127,6 +127,33 @@ tabPlus.generateRow(['a', null, ''], {emptyField: missing});
 ```
 
 <!--lang:es-->
+### La opción `objectRows`
+
+Por defecto `parseTab` devuelve `rows` como un array de arrays (un valor por columna, en el mismo orden que
+`fields`). Con `{objectRows: true}` devuelve en cambio un array de objetos, uno por fila, con los nombres de
+columna como atributos.
+
+`generateTab` acepta ambas formas indistintamente (sin necesidad de pasar la opción): detecta fila por fila si
+es un array o un objeto.
+<!--lang:en--]
+### The `objectRows` option
+
+By default `parseTab` returns `rows` as an array of arrays (one value per column, in the same order as
+`fields`). With `{objectRows: true}` it instead returns an array of objects, one per row, with the column
+names as attributes.
+
+`generateTab` accepts either shape indistinctly (no need to pass the option): it detects, row by row, whether
+it's an array or an object.
+[!--lang:*-->
+
+```js
+tabPlus.parseTab('a|b\r\n1|2\r\n', {objectRows: true});
+// => {fields: ['a', 'b'], rows: [{a: '1', b: '2'}]}
+tabPlus.generateTab({fields: ['a', 'b'], rows: [{a: '1', b: '2'}]});
+// => 'a|b\r\n1|2\r\n'
+```
+
+<!--lang:es-->
 ## Instalación
 <!--lang:en--]
 ## Install
@@ -158,12 +185,14 @@ import * as tabPlus from 'tab-plus';
 
 <!--lang:es-->
 Parsea el contenido completo de un archivo `.tab`. Devuelve `{fields, rows}` donde `fields` es un array con los
-nombres de columna y `rows` es un array de arrays de valores de campo (strings, además de `null` donde
-corresponda — ver `emptyField` más arriba). `options` es opcional; ver la opción `emptyField` más arriba.
+nombres de columna y `rows` es un array de arrays de valores de campo (strings, además de `null` o el symbol
+configurado donde corresponda — ver `emptyField` más arriba), o un array de objetos si se pasa
+`{objectRows: true}` (ver `objectRows` más arriba). `options` es opcional.
 <!--lang:en--]
-Parses the full content of a `.tab` file. Returns `{fields, rows}` where `fields` is an array of column names and
-`rows` is an array of arrays of field values (strings, plus `null` where applicable — see `emptyField` above).
-`options` is optional; see the `emptyField` option above.
+Parses the full content of a `.tab` file. Returns `{fields, rows}` where `fields` is an array of column names
+and `rows` is an array of arrays of field values (strings, plus `null` or the configured symbol where
+applicable — see `emptyField` above), or an array of objects if `{objectRows: true}` is passed (see
+`objectRows` above). `options` is optional.
 [!--lang:*-->
 
 ```js
@@ -174,11 +203,13 @@ tabPlus.parseTab('a|b\r\n1|2\r\n');
 ### `tabPlus.generateTab(tab, options)`
 
 <!--lang:es-->
-Genera el contenido completo de un archivo `.tab` a partir de `{fields, rows}` (la inversa de `parseTab`).
-`options` es opcional; ver la opción `emptyField` más arriba.
+Genera el contenido completo de un archivo `.tab` a partir de `{fields, rows}` (la inversa de `parseTab`),
+donde cada fila puede ser un array o un objeto (ver `objectRows` más arriba). `options` es opcional; ver la
+opción `emptyField` más arriba.
 <!--lang:en--]
-Generates the full content of a `.tab` file from `{fields, rows}` (the inverse of `parseTab`). `options` is
-optional; see the `emptyField` option above.
+Generates the full content of a `.tab` file from `{fields, rows}` (the inverse of `parseTab`), where each row
+can be an array or an object (see `objectRows` above). `options` is optional; see the `emptyField` option
+above.
 [!--lang:*-->
 
 ```js
@@ -216,12 +247,14 @@ separate behavior for a missing array entry vs. an explicit `null`.
 ### Tipos
 
 El paquete exporta los tipos de TypeScript `FieldValue` (`string | null | symbol`), `Options` (`{emptyField?:
-'string' | 'null' | symbol}`) y `Tab` (`{fields: FieldValue[], rows: FieldValue[][]}`).
+'string' | 'null' | symbol, objectRows?: boolean}`), `Tab` (`{fields: FieldValue[], rows: FieldValue[][]}`),
+`RowObject` (`{[field: string]: FieldValue}`) y `ObjectTab` (`{fields: FieldValue[], rows: RowObject[]}`).
 <!--lang:en--]
 ### Types
 
 The package exports the TypeScript types `FieldValue` (`string | null | symbol`), `Options` (`{emptyField?:
-'string' | 'null' | symbol}`) and `Tab` (`{fields: FieldValue[], rows: FieldValue[][]}`).
+'string' | 'null' | symbol, objectRows?: boolean}`), `Tab` (`{fields: FieldValue[], rows: FieldValue[][]}`),
+`RowObject` (`{[field: string]: FieldValue}`) and `ObjectTab` (`{fields: FieldValue[], rows: RowObject[]}`).
 [!--lang:*-->
 
 <!--lang:es-->
