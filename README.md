@@ -38,8 +38,11 @@ never emits an escaped `|` (`\|`) — a literal `|` in a value is always generat
 * `'null'`: a field with no content at all parses as `null`; an empty string value (`''`) is generated
   explicitly as `\E` (since implicit-empty now means `null`).
 * a `symbol`: a field with no content at all parses as that exact symbol; both `''` and `null` are generated
-  explicitly (as `\E` and `\N`). This is useful as a sentinel for "no data" that's guaranteed not to collide
-  with any real string or `null` value in your domain. Generating a field for any other symbol throws.
+  explicitly (as `\E` and `\N`). This is useful when the meaning of "nothing was written here" needs to be told
+  apart from an explicit `''` or `null` — for example, when loading a `.tab` file into a table and you want a
+  field left blank to mean "use whatever the column's definition says" (its schema default, or leave it
+  untouched), while `\E` and `\N` still let you force an empty string or `NULL` regardless of that definition.
+  Generating a field for any other symbol throws.
 
 In every mode `\E` always parses as `''` and `\N` always parses as `null`, and `generateTab`/`generateRow` never
 need to emit them for the "default" value of the chosen mode — only for the non-default ones — so a round trip
