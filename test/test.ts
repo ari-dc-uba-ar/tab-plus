@@ -55,6 +55,31 @@ describe('emptyField option', function(){
         const text = tabPlus.generateTab(tab, {emptyField: 'null'});
         expect(tabPlus.parseTab(text, {emptyField: 'null'})).to.eql(tab);
     });
+
+    describe('with a symbol', function(){
+        const missing = Symbol('missing');
+
+        it('adjacent separators parse as the given symbol', function(){
+            expect(tabPlus.parseRow('a||b', {emptyField: missing})).to.eql(['a', missing, 'b']);
+        });
+        it('\\E and \\N still parse as an explicit empty string and null', function(){
+            expect(tabPlus.parseRow('a|\\E|\\N', {emptyField: missing})).to.eql(['a', '', null]);
+        });
+        it('the given symbol is generated as an empty (implicit) field', function(){
+            expect(tabPlus.generateRow(['a', missing, 'b'], {emptyField: missing})).to.eql('a||b');
+        });
+        it('null and an empty string are generated explicitly, as \\N and \\E', function(){
+            expect(tabPlus.generateRow(['a', null, ''], {emptyField: missing})).to.eql('a|\\N|\\E');
+        });
+        it('throws when given a symbol that does not match options.emptyField', function(){
+            const other = Symbol('other');
+            expect(function(){ tabPlus.generateRow(['a', other], {emptyField: missing}); }).to.throwError();
+        });
+        it('round-trips the symbol through generateRow/parseRow', function(){
+            const row: FieldValue[] = ['plain', missing, ''];
+            expect(tabPlus.parseRow(tabPlus.generateRow(row, {emptyField: missing}), {emptyField: missing})).to.eql(row);
+        });
+    });
 });
 
 describe('escapeField / generateRow', function(){

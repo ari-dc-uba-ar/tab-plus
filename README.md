@@ -31,17 +31,20 @@ never emits an escaped `|` (`\|`) — a literal `|` in a value is always generat
 ### The `emptyField` option
 
 `parseTab`, `generateTab`, `parseRow`, `generateRow`, `unescapeField` and `escapeField` all accept an optional
-`options` argument with an `emptyField` property, either `'string'` (the default) or `'null'`:
+`options` argument with an `emptyField` property: `'string'` (the default), `'null'`, or a `symbol`.
 
 * `'string'` (default): a field with no content at all parses as `''`; a `null` value is generated explicitly
   as `\N` (since implicit-empty already means `''`).
 * `'null'`: a field with no content at all parses as `null`; an empty string value (`''`) is generated
   explicitly as `\E` (since implicit-empty now means `null`).
+* a `symbol`: a field with no content at all parses as that exact symbol; both `''` and `null` are generated
+  explicitly (as `\E` and `\N`). This is useful as a sentinel for "no data" that's guaranteed not to collide
+  with any real string or `null` value in your domain. Generating a field for any other symbol throws.
 
-In both modes `\E` always parses as `''` and `\N` always parses as `null`, and `generateTab`/`generateRow` never
-need to emit them for the "default" value of the chosen mode — only for the non-default one, so a round trip
-through `generateTab`/`parseTab` (or `generateRow`/`parseRow`) with the same options always preserves `''` vs
-`null`.
+In every mode `\E` always parses as `''` and `\N` always parses as `null`, and `generateTab`/`generateRow` never
+need to emit them for the "default" value of the chosen mode — only for the non-default ones — so a round trip
+through `generateTab`/`parseTab` (or `generateRow`/`parseRow`) with the same options always preserves `''`,
+`null` and the configured symbol as distinct values.
 
 ```js
 tabPlus.parseRow('a||b', {emptyField: 'null'});
@@ -50,6 +53,12 @@ tabPlus.generateRow(['a', null, 'b'], {emptyField: 'null'});
 // => 'a||b'
 tabPlus.generateRow(['a', '', 'b'], {emptyField: 'null'});
 // => 'a|\\E|b'
+
+var missing = Symbol('missing');
+tabPlus.parseRow('a||b', {emptyField: missing});
+// => ['a', missing, 'b']
+tabPlus.generateRow(['a', null, ''], {emptyField: missing});
+// => 'a|\\N|\\E'
 ```
 
 ## Install
@@ -106,8 +115,8 @@ Escape/unescape a single field's value.
 
 ### Types
 
-The package exports the TypeScript types `FieldValue` (`string | null`), `Options` (`{emptyField?: 'string' |
-'null'}`) and `Tab` (`{fields: FieldValue[], rows: FieldValue[][]}`).
+The package exports the TypeScript types `FieldValue` (`string | null | symbol`), `Options` (`{emptyField?:
+'string' | 'null' | symbol}`) and `Tab` (`{fields: FieldValue[], rows: FieldValue[][]}`).
 
 ## License
 
