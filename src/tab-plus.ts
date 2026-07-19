@@ -68,7 +68,10 @@ export function unescapeField(rawValue: string, options?: Options): FieldValue {
 // turns a field's real value into raw (escaped) text safe to embed between '|' separators
 export function escapeField(value: FieldValue | undefined, options?: Options): string {
     const emptyValue = emptyFieldValue(options);
-    if(value === undefined || value === emptyValue){
+    if(value == null){
+        value = null;
+    }
+    if(value === emptyValue){
         return '';
     }
     if(value === null){

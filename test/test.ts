@@ -56,6 +56,19 @@ describe('emptyField option', function(){
         expect(tabPlus.parseTab(text, {emptyField: 'null'})).to.eql(tab);
     });
 
+    it('treats undefined exactly like null (default mode)', function(){
+        expect(tabPlus.generateRow(['a', undefined, 'b'])).to.eql(tabPlus.generateRow(['a', null, 'b']));
+    });
+    it('treats undefined exactly like null (emptyField: "null")', function(){
+        expect(tabPlus.generateRow(['a', undefined, 'b'], {emptyField: 'null'}))
+            .to.eql(tabPlus.generateRow(['a', null, 'b'], {emptyField: 'null'}));
+    });
+    it('treats undefined exactly like null (emptyField: a symbol)', function(){
+        const missing = Symbol('missing');
+        expect(tabPlus.generateRow(['a', undefined, 'b'], {emptyField: missing}))
+            .to.eql(tabPlus.generateRow(['a', null, 'b'], {emptyField: missing}));
+    });
+
     describe('with a symbol', function(){
         const missing = Symbol('missing');
 

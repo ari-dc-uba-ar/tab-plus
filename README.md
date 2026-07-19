@@ -114,7 +114,8 @@ Generates a single raw line (without a line break) from an array of field values
 
 ### `tabPlus.escapeField(value, options)` / `tabPlus.unescapeField(rawValue, options)`
 
-Escape/unescape a single field's value.
+Escape/unescape a single field's value. `escapeField` treats `undefined` exactly like `null` — there's no
+separate behavior for a missing array entry vs. an explicit `null`.
 
 ### Types
 
