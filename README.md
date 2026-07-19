@@ -14,7 +14,9 @@ to seed database tables with initial data.
   * `\` followed by any other character yields that character literally (so `\\` is `\` and `\|` is `|`).
 * Lines made up only of `-`, `|` and spaces (e.g. a markdown-style `---|---` divider) and blank lines are ignored,
   so `.tab` files can be written to look like a readable table.
-* Trailing whitespace on a field is trimmed.
+* Trailing whitespace on a field is trimmed. This trimming happens on the raw (still escaped) text before
+  escape sequences are resolved, so it only removes literal trailing spaces/tabs — a trailing `\s` (or any
+  other escape sequence) is not affected and is kept in the resulting value.
 * A leading UTF-8 BOM on the first header field is stripped.
 
 The **generator** in this library always produces output that is safe to split "raw": splitting the generated
