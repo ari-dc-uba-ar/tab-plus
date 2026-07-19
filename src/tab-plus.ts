@@ -2,11 +2,19 @@ export type FieldValue = string | null | symbol;
 
 export interface Options {
     emptyField?: 'string' | 'null' | symbol;
+    objectRows?: boolean;
 }
 
 export interface Tab {
     fields: FieldValue[];
     rows: FieldValue[][];
+}
+
+export type RowObject = {[field: string]: FieldValue};
+
+export interface ObjectTab {
+    fields: FieldValue[];
+    rows: RowObject[];
 }
 
 // a field separator '|' is only a separator when not escaped by an odd number of preceding backslashes
@@ -109,8 +117,18 @@ export function generateRow(row: (FieldValue | undefined)[], options?: Options):
     }).join('|');
 }
 
+function rowToObject(fields: FieldValue[], row: FieldValue[]): RowObject {
+    const obj: RowObject = {};
+    fields.forEach(function(field, i){
+        obj[typeof field === 'string' ? field : String(field)] = row[i];
+    });
+    return obj;
+}
+
 // parses the full content of a .tab file into {fields, rows}
-export function parseTab(text: string, options?: Options): Tab {
+export function parseTab(text: string, options?: Options & {objectRows?: false}): Tab;
+export function parseTab(text: string, options: Options & {objectRows: true}): ObjectTab;
+export function parseTab(text: string, options?: Options): Tab | ObjectTab {
     const lines = String(text).split(/\r?\n/)
         .filter(function(line){ return !commentOrBlankLine.test(line); })
         .map(function(line){ return parseRow(line, options); })
@@ -122,12 +140,26 @@ export function parseTab(text: string, options?: Options): Tab {
     if(typeof firstField === 'string' && firstField.charCodeAt(0) === 0xfeff){
         lines[0][0] = firstField.slice(1);
     }
-    return {fields: lines[0], rows: lines.slice(1)};
+    const fields = lines[0];
+    const dataRows = lines.slice(1);
+    if(options && options.objectRows){
+        return {fields: fields, rows: dataRows.map(function(row){ return rowToObject(fields, row); })};
+    }
+    return {fields: fields, rows: dataRows};
 }
 
-// generates the full content of a .tab file from {fields, rows}
-export function generateTab(tab: Tab, options?: Options): string {
-    return [tab.fields].concat(tab.rows).map(function(row){
+// generates the full content of a .tab file from {fields, rows} (rows can be arrays or, as returned by
+// parseTab with objectRows:true, objects keyed by field name)
+export function generateTab(tab: Tab | ObjectTab, options?: Options): string {
+    const rows = tab.rows.map(function(row){
+        if(Array.isArray(row)){
+            return row;
+        }
+        return tab.fields.map(function(field){
+            return row[typeof field === 'string' ? field : String(field)];
+        });
+    });
+    return [tab.fields].concat(rows).map(function(row){
         return generateRow(row, options);
     }).map(function(line){
         return line + '\r\n';
