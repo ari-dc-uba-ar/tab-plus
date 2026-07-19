@@ -1,5 +1,7 @@
 # tab-plus
 
+*Read this in other languages: [Español](README.es.md)*
+
 Parser and generator for the `.tab` file format used by [backend-plus](https://github.com/codenautas/backend-plus)
 to seed database tables with initial data.
 
