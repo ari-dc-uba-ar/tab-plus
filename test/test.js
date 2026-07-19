@@ -11,7 +11,9 @@ describe('parseRow', function(){
         ['multi escaped pipes \\|a\\\\|b\\\\\\|c\\\\\\\\|d', ['multi escaped pipes |a\\', 'b\\|c\\\\', 'd']],
         ['|line with hex \\x7c pipe', ['', 'line with hex | pipe']],
         ['a\\sb', ['a b']],
-        ['trailing space   |b', ['trailing space', 'b']]
+        ['trailing space   |b', ['trailing space', 'b']],
+        ['a\\s|b', ['a ', 'b']],
+        ['a\\s   |b', ['a ', 'b']]
     ];
     fixtures.forEach(function(fixture){
         it('parses '+JSON.stringify(fixture[0]), function(){
