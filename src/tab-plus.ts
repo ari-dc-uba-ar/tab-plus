@@ -1,7 +1,7 @@
-export type FieldValue = string | null;
+export type FieldValue = string | null | symbol;
 
 export interface Options {
-    emptyField?: 'string' | 'null';
+    emptyField?: 'string' | 'null' | symbol;
 }
 
 export interface Tab {
@@ -28,10 +28,18 @@ function toHex(char: string): string {
 }
 
 // options.emptyField: how a field with no content at all (adjacent separators, e.g. `a||b`) is parsed/generated:
-// 'string' (default, backwards compatible) means it is an empty string; 'null' means it is `null`.
+// 'string' (default, backwards compatible) means it is an empty string; 'null' means it is `null`; passing a
+// symbol means it is that symbol (handy as a sentinel distinct from any real string or `null` value).
 // Regardless of this option, `\E` always means an explicit empty string and `\N` always means an explicit `null`.
 function emptyFieldValue(options?: Options): FieldValue {
-    return options && options.emptyField === 'null' ? null : '';
+    const emptyField = options && options.emptyField;
+    if(emptyField === 'null'){
+        return null;
+    }
+    if(typeof emptyField === 'symbol'){
+        return emptyField;
+    }
+    return '';
 }
 
 // turns the raw (still escaped) text of one field into its real value
@@ -59,11 +67,22 @@ export function unescapeField(rawValue: string, options?: Options): FieldValue {
 
 // turns a field's real value into raw (escaped) text safe to embed between '|' separators
 export function escapeField(value: FieldValue | undefined, options?: Options): string {
-    if(value === null || value === undefined){
-        return emptyFieldValue(options) === null ? '' : explicitNull;
+    const emptyValue = emptyFieldValue(options);
+    if(value == null){
+        value = null;
     }
-    if(value === '' && emptyFieldValue(options) === null){
+    if(value === emptyValue){
+        return '';
+    }
+    if(value === null){
+        return explicitNull;
+    }
+    if(value === ''){
         return explicitEmpty;
+    }
+    if(typeof value === 'symbol'){
+        throw new TypeError('tab-plus: cannot generate a field for symbol ' + value.toString() +
+            ', it does not match options.emptyField');
     }
     return value.replace(charsNeedingEscape, function(char: string): string {
         switch(char){
@@ -95,7 +114,7 @@ export function parseTab(text: string, options?: Options): Tab {
     const lines = String(text).split(/\r?\n/)
         .filter(function(line){ return !commentOrBlankLine.test(line); })
         .map(function(line){ return parseRow(line, options); })
-        .filter(function(row){ return row.length > 1 || (row.length === 1 && (row[0] === null || row[0].trim() !== '')); });
+        .filter(function(row){ return row.length > 1 || (row.length === 1 && (typeof row[0] !== 'string' || row[0].trim() !== '')); });
     if(lines.length === 0){
         return {fields: [], rows: []};
     }
