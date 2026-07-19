@@ -1,0 +1,14 @@
+root = true
+
+# Defaults for every file
+[*]
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+indent_style = space
+
+[test/fixtures/simple.tab]
+insert_final_newline = false
+
+[test/fixtures/users.tab]
+insert_final_newline = true
