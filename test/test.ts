@@ -1,24 +1,59 @@
-"use strict";
-
-var expect = require('expect.js');
-var fs = require('fs');
-var path = require('path');
-var tabPlus = require('../tab-plus.js');
+import expect = require('expect.js');
+import fs = require('fs');
+import path = require('path');
+import * as tabPlus from '../src/tab-plus';
+import {FieldValue} from '../src/tab-plus';
 
 describe('parseRow', function(){
-    var fixtures = [
+    const fixtures: [string, FieldValue[]][] = [
         ['splited\\n line\\r\\n|field with pipe \\|', ['splited\n line\r\n', 'field with pipe |']],
         ['multi escaped pipes \\|a\\\\|b\\\\\\|c\\\\\\\\|d', ['multi escaped pipes |a\\', 'b\\|c\\\\', 'd']],
         ['|line with hex \\x7c pipe', ['', 'line with hex | pipe']],
         ['a\\sb', ['a b']],
         ['trailing space   |b', ['trailing space', 'b']],
         ['a\\s|b', ['a ', 'b']],
-        ['a\\s   |b', ['a ', 'b']]
+        ['a\\s   |b', ['a ', 'b']],
+        ['a|\\E|b', ['a', '', 'b']],
+        ['a|\\N|b', ['a', null, 'b']]
     ];
     fixtures.forEach(function(fixture){
         it('parses '+JSON.stringify(fixture[0]), function(){
             expect(tabPlus.parseRow(fixture[0])).to.eql(fixture[1]);
         });
+    });
+});
+
+describe('emptyField option', function(){
+    it('by default, adjacent separators parse as an empty string', function(){
+        expect(tabPlus.parseRow('a||b')).to.eql(['a', '', 'b']);
+    });
+    it('with emptyField: "null", adjacent separators parse as null', function(){
+        expect(tabPlus.parseRow('a||b', {emptyField: 'null'})).to.eql(['a', null, 'b']);
+    });
+    it('\\E always parses as an empty string, regardless of emptyField', function(){
+        expect(tabPlus.parseRow('a|\\E|b', {emptyField: 'null'})).to.eql(['a', '', 'b']);
+    });
+    it('\\N always parses as null, regardless of emptyField', function(){
+        expect(tabPlus.parseRow('a|\\N|b')).to.eql(['a', null, 'b']);
+    });
+    it('by default, null is generated explicitly as \\N', function(){
+        expect(tabPlus.generateRow(['a', null, 'b'])).to.eql('a|\\N|b');
+    });
+    it('with emptyField: "null", null is generated as an empty (implicit) field', function(){
+        expect(tabPlus.generateRow(['a', null, 'b'], {emptyField: 'null'})).to.eql('a||b');
+    });
+    it('with emptyField: "null", an empty string is generated explicitly as \\E', function(){
+        expect(tabPlus.generateRow(['a', '', 'b'], {emptyField: 'null'})).to.eql('a|\\E|b');
+    });
+    it('round-trips null and empty string through generateRow/parseRow under both modes', function(){
+        const row: FieldValue[] = ['', null, 'plain'];
+        expect(tabPlus.parseRow(tabPlus.generateRow(row))).to.eql(row);
+        expect(tabPlus.parseRow(tabPlus.generateRow(row, {emptyField: 'null'}), {emptyField: 'null'})).to.eql(row);
+    });
+    it('round-trips a null field through generateTab/parseTab', function(){
+        const tab: tabPlus.Tab = {fields: ['id', 'note'], rows: [['1', null], ['2', '']]};
+        const text = tabPlus.generateTab(tab, {emptyField: 'null'});
+        expect(tabPlus.parseTab(text, {emptyField: 'null'})).to.eql(tab);
     });
 });
 
@@ -40,33 +75,33 @@ describe('escapeField / generateRow', function(){
         expect(tabPlus.generateRow(['a', 'b', 'c'])).to.eql('a|b|c');
     });
     it('round-trips through parseRow', function(){
-        var row = ['plain', 'with|pipe', 'with\\backslash', 'with\r\n\tcontrol', ''];
+        const row: FieldValue[] = ['plain', 'with|pipe', 'with\\backslash', 'with\r\n\tcontrol', ''];
         expect(tabPlus.parseRow(tabPlus.generateRow(row))).to.eql(row);
     });
 });
 
 describe('parseTab', function(){
     it('parses a simple fixture', function(){
-        var content = fs.readFileSync(path.join(__dirname, 'fixtures/simple.tab'), 'utf-8');
-        var tab = tabPlus.parseTab(content);
+        const content = fs.readFileSync(path.join(__dirname, 'fixtures/simple.tab'), 'utf-8');
+        const tab = tabPlus.parseTab(content);
         expect(tab.fields).to.eql(['simple_code', 'simple_name']);
         expect(tab.rows).to.eql([['1', 'one'], ['2', 'the second']]);
     });
     it('parses the users fixture and drops the trailing blank line', function(){
-        var content = fs.readFileSync(path.join(__dirname, 'fixtures/users.tab'), 'utf-8');
-        var tab = tabPlus.parseTab(content);
+        const content = fs.readFileSync(path.join(__dirname, 'fixtures/users.tab'), 'utf-8');
+        const tab = tabPlus.parseTab(content);
         expect(tab.fields).to.eql(['username', 'md5pass', 'active_until', 'locked_since', 'rol']);
         expect(tab.rows).to.eql([['bob', '6bdb73cceeff578319840176854246e5', '2099-01-01', '2099-01-01', 'admin']]);
     });
     it('ignores markdown-style separator and blank lines', function(){
-        var content = 'a|b\r\n---|---\r\n\r\n1|2\r\n';
-        var tab = tabPlus.parseTab(content);
+        const content = 'a|b\r\n---|---\r\n\r\n1|2\r\n';
+        const tab = tabPlus.parseTab(content);
         expect(tab.fields).to.eql(['a', 'b']);
         expect(tab.rows).to.eql([['1', '2']]);
     });
     it('strips a leading UTF8 BOM from the first header field', function(){
-        var content = '﻿a|b\r\n1|2\r\n';
-        var tab = tabPlus.parseTab(content);
+        const content = '﻿a|b\r\n1|2\r\n';
+        const tab = tabPlus.parseTab(content);
         expect(tab.fields).to.eql(['a', 'b']);
     });
     it('returns empty fields and rows for empty content', function(){
@@ -76,11 +111,11 @@ describe('parseTab', function(){
 
 describe('generateTab', function(){
     it('generates CRLF-separated lines with a trailing line ending', function(){
-        var text = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2']]});
+        const text = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2']]});
         expect(text).to.eql('a|b\r\n1|2\r\n');
     });
     it('round-trips arbitrary data through parseTab', function(){
-        var tab = {
+        const tab: tabPlus.Tab = {
             fields: ['id', 'text'],
             rows: [
                 ['1', 'plain text'],
@@ -92,9 +127,9 @@ describe('generateTab', function(){
         expect(tabPlus.parseTab(tabPlus.generateTab(tab))).to.eql(tab);
     });
     it('never emits an unescaped separator character inside a value', function(){
-        var tab = {fields: ['f'], rows: [['line1\nline2\r\nline3|piped\\backslash']]};
-        var text = tabPlus.generateTab(tab);
-        var lines = text.split(/\r\n/).filter(function(line){ return line !== ''; });
+        const tab: tabPlus.Tab = {fields: ['f'], rows: [['line1\nline2\r\nline3|piped\\backslash']]};
+        const text = tabPlus.generateTab(tab);
+        const lines = text.split(/\r\n/).filter(function(line){ return line !== ''; });
         expect(lines.length).to.eql(2);
         lines.forEach(function(line){
             expect(tabPlus.parseRow(line).length).to.be.greaterThan(0);
