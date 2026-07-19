@@ -34,13 +34,34 @@ var commentOrBlankLine = /^[-| ]*$/;
 
 var charsNeedingEscape = /[\\|\r\n\t\x00-\x1f\x7f]/g;
 
+// whole-field markers: explicit empty string and explicit null, regardless of the `emptyField` option
+var explicitEmpty = '\\E';
+var explicitNull = '\\N';
+
 function toHex(char){
     return '\\x' + char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0');
 }
 
+// options.emptyField: how a field with no content at all (adjacent separators, e.g. `a||b`) is parsed/generated:
+// 'string' (default, backwards compatible) means it is an empty string; 'null' means it is `null`.
+// Regardless of this option, `\E` always means an explicit empty string and `\N` always means an explicit `null`.
+function emptyFieldValue(options){
+    return options && options.emptyField === 'null' ? null : '';
+}
+
 // turns the raw (still escaped) text of one field into its real value
-tabPlus.unescapeField = function unescapeField(rawValue){
-    return rawValue.trimEnd().replace(escapeSequence, function(_, escaped){
+tabPlus.unescapeField = function unescapeField(rawValue, options){
+    var trimmed = rawValue.trimEnd();
+    if(trimmed === explicitEmpty){
+        return '';
+    }
+    if(trimmed === explicitNull){
+        return null;
+    }
+    if(trimmed === ''){
+        return emptyFieldValue(options);
+    }
+    return trimmed.replace(escapeSequence, function(_, escaped){
         switch(escaped){
             case 't': return '\t';
             case 'r': return '\r';
@@ -52,7 +73,13 @@ tabPlus.unescapeField = function unescapeField(rawValue){
 };
 
 // turns a field's real value into raw (escaped) text safe to embed between '|' separators
-tabPlus.escapeField = function escapeField(value){
+tabPlus.escapeField = function escapeField(value, options){
+    if(value === null || value === undefined){
+        return emptyFieldValue(options) === null ? '' : explicitNull;
+    }
+    if(value === '' && emptyFieldValue(options) === null){
+        return explicitEmpty;
+    }
     return String(value).replace(charsNeedingEscape, function(char){
         switch(char){
             case '\\': return '\\\\';
@@ -65,33 +92,39 @@ tabPlus.escapeField = function escapeField(value){
 };
 
 // parses one raw line (without CR/LF) into an array of field values
-tabPlus.parseRow = function parseRow(rawRow){
-    return rawRow.split(unescapedPipe).map(tabPlus.unescapeField);
+tabPlus.parseRow = function parseRow(rawRow, options){
+    return rawRow.split(unescapedPipe).map(function(rawValue){
+        return tabPlus.unescapeField(rawValue, options);
+    });
 };
 
 // generates one raw line (without CR/LF) from an array of field values
-tabPlus.generateRow = function generateRow(row){
-    return row.map(tabPlus.escapeField).join('|');
+tabPlus.generateRow = function generateRow(row, options){
+    return row.map(function(value){
+        return tabPlus.escapeField(value, options);
+    }).join('|');
 };
 
 // parses the full content of a .tab file into {fields, rows}
-tabPlus.parseTab = function parseTab(text){
+tabPlus.parseTab = function parseTab(text, options){
     var lines = String(text).split(/\r?\n/)
         .filter(function(line){ return !commentOrBlankLine.test(line); })
-        .map(tabPlus.parseRow)
-        .filter(function(row){ return row.length > 1 || (row.length === 1 && row[0].trim() !== ''); });
+        .map(function(line){ return tabPlus.parseRow(line, options); })
+        .filter(function(row){ return row.length > 1 || (row.length === 1 && (row[0] === null || row[0].trim() !== '')); });
     if(lines.length === 0){
         return {fields: [], rows: []};
     }
-    if(lines[0][0].charCodeAt(0) === 0xfeff){
+    if(typeof lines[0][0] === 'string' && lines[0][0].charCodeAt(0) === 0xfeff){
         lines[0][0] = lines[0][0].slice(1);
     }
     return {fields: lines[0], rows: lines.slice(1)};
 };
 
 // generates the full content of a .tab file from {fields, rows}
-tabPlus.generateTab = function generateTab(tab){
-    return [tab.fields].concat(tab.rows).map(tabPlus.generateRow).map(function(line){
+tabPlus.generateTab = function generateTab(tab, options){
+    return [tab.fields].concat(tab.rows).map(function(row){
+        return tabPlus.generateRow(row, options);
+    }).map(function(line){
         return line + '\r\n';
     }).join('');
 };

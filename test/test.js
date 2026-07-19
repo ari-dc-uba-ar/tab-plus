@@ -13,12 +13,48 @@ describe('parseRow', function(){
         ['a\\sb', ['a b']],
         ['trailing space   |b', ['trailing space', 'b']],
         ['a\\s|b', ['a ', 'b']],
-        ['a\\s   |b', ['a ', 'b']]
+        ['a\\s   |b', ['a ', 'b']],
+        ['a|\\E|b', ['a', '', 'b']],
+        ['a|\\N|b', ['a', null, 'b']]
     ];
     fixtures.forEach(function(fixture){
         it('parses '+JSON.stringify(fixture[0]), function(){
             expect(tabPlus.parseRow(fixture[0])).to.eql(fixture[1]);
         });
+    });
+});
+
+describe('emptyField option', function(){
+    it('by default, adjacent separators parse as an empty string', function(){
+        expect(tabPlus.parseRow('a||b')).to.eql(['a', '', 'b']);
+    });
+    it('with emptyField: "null", adjacent separators parse as null', function(){
+        expect(tabPlus.parseRow('a||b', {emptyField: 'null'})).to.eql(['a', null, 'b']);
+    });
+    it('\\E always parses as an empty string, regardless of emptyField', function(){
+        expect(tabPlus.parseRow('a|\\E|b', {emptyField: 'null'})).to.eql(['a', '', 'b']);
+    });
+    it('\\N always parses as null, regardless of emptyField', function(){
+        expect(tabPlus.parseRow('a|\\N|b')).to.eql(['a', null, 'b']);
+    });
+    it('by default, null is generated explicitly as \\N', function(){
+        expect(tabPlus.generateRow(['a', null, 'b'])).to.eql('a|\\N|b');
+    });
+    it('with emptyField: "null", null is generated as an empty (implicit) field', function(){
+        expect(tabPlus.generateRow(['a', null, 'b'], {emptyField: 'null'})).to.eql('a||b');
+    });
+    it('with emptyField: "null", an empty string is generated explicitly as \\E', function(){
+        expect(tabPlus.generateRow(['a', '', 'b'], {emptyField: 'null'})).to.eql('a|\\E|b');
+    });
+    it('round-trips null and empty string through generateRow/parseRow under both modes', function(){
+        var row = ['', null, 'plain'];
+        expect(tabPlus.parseRow(tabPlus.generateRow(row))).to.eql(row);
+        expect(tabPlus.parseRow(tabPlus.generateRow(row, {emptyField: 'null'}), {emptyField: 'null'})).to.eql(row);
+    });
+    it('round-trips a null field through generateTab/parseTab', function(){
+        var tab = {fields: ['id', 'note'], rows: [['1', null], ['2', '']]};
+        var text = tabPlus.generateTab(tab, {emptyField: 'null'});
+        expect(tabPlus.parseTab(text, {emptyField: 'null'})).to.eql(tab);
     });
 });
 
