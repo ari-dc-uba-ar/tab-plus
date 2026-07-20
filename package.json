@@ -25,10 +25,13 @@
     "@types/expect.js": "^0.3.32",
     "@types/mocha": "^10.0.10",
     "@types/node": "^26.1.1",
+    "@types/parallel-transform": "^1.1.4",
     "expect.js": "^0.3.1",
+    "line-splitter": "^0.8.0",
     "mocha": "^11.7.6",
     "multilang": "^1.2.3",
     "nyc": "^18.0.0",
+    "parallel-transform": "^1.2.0",
     "qa-control": "^0.7.5",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2"

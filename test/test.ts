@@ -1,6 +1,9 @@
 import expect = require('expect.js');
 import fs = require('fs');
 import path = require('path');
+import stream = require('stream');
+import parallelTransform = require('parallel-transform');
+import {LineSplitter, LineJoiner, LineElement} from 'line-splitter';
 import * as tabPlus from '../src/tab-plus';
 import {FieldValue} from '../src/tab-plus';
 
@@ -198,5 +201,252 @@ describe('generateTab', function(){
             expect(tabPlus.parseRow(line).length).to.be.greaterThan(0);
         });
         expect(tabPlus.parseTab(text)).to.eql(tab);
+    });
+});
+
+describe('getParseTransformer', function(){
+    function collectRows<T extends FieldValue[] | tabPlus.RowObject>(transformer: tabPlus.ParseTransformer<T>, lines: string[]): T[] {
+        const rows: T[] = [];
+        lines.forEach(function(line){
+            transformer(line, function(err, row){
+                if(err){ throw err; }
+                if(row != null){ rows.push(row); }
+            });
+        });
+        return rows;
+    }
+    it('keeps the first line as fields and also emits it as the first array row', function(){
+        const transformer = tabPlus.getParseTransformer();
+        const rows = collectRows(transformer, ['a|b']);
+        expect(transformer.fields).to.eql(['a', 'b']);
+        expect(rows).to.eql([['a', 'b']]);
+    });
+    it('emits subsequent lines as array rows, header included', function(){
+        const transformer = tabPlus.getParseTransformer();
+        const rows = collectRows(transformer, ['a|b', '1|2', '3|4']);
+        expect(rows).to.eql([['a', 'b'], ['1', '2'], ['3', '4']]);
+    });
+    it('emits object rows keyed by the stored fields with objectRows: true, header not repeated', function(){
+        const transformer = tabPlus.getParseTransformer({objectRows: true});
+        const rows = collectRows(transformer, ['a|b', '1|2', '3|4']);
+        expect(transformer.fields).to.eql(['a', 'b']);
+        expect(rows).to.eql([{a: '1', b: '2'}, {a: '3', b: '4'}]);
+    });
+    it('emits nothing for comment and blank lines', function(){
+        const transformer = tabPlus.getParseTransformer();
+        const rows = collectRows(transformer, ['a|b', '---|---', '', '1|2']);
+        expect(rows).to.eql([['a', 'b'], ['1', '2']]);
+    });
+    it('strips a leading UTF8 BOM from the first header field', function(){
+        const transformer = tabPlus.getParseTransformer();
+        collectRows(transformer, ['﻿a|b']);
+        expect(transformer.fields).to.eql(['a', 'b']);
+    });
+    it('reports parse errors through the callback instead of throwing', function(){
+        const transformer = tabPlus.getParseTransformer();
+        collectRows(transformer, ['a|b']);
+        let captured: Error | null = null;
+        transformer('1|\\xzz', function(err){ captured = err; });
+        expect(captured).to.be.an(Error);
+    });
+});
+
+describe('getGenerateTransformer', function(){
+    function collectLines(transformer: tabPlus.GenerateTransformer, rows: ((FieldValue | undefined)[] | tabPlus.RowObject)[]): string[] {
+        const collected: string[] = [];
+        rows.forEach(function(row){
+            transformer(row, function(err, lines){
+                if(err){ throw err; }
+                if(lines != null){
+                    (Array.isArray(lines) ? lines : [lines]).forEach(function(line){ collected.push(line); });
+                }
+            });
+        });
+        return collected;
+    }
+    it('a first array row is the header line and defines fields', function(){
+        const transformer = tabPlus.getGenerateTransformer();
+        const lines = collectLines(transformer, [['a', 'b'], ['1', '2']]);
+        expect(transformer.fields).to.eql(['a', 'b']);
+        expect(lines).to.eql(['a|b', '1|2']);
+    });
+    it('a first object row defines fields with its keys and emits header and data lines', function(){
+        const transformer = tabPlus.getGenerateTransformer();
+        const lines = collectLines(transformer, [{a: '1', b: '2'}, {a: '3', b: '4'}]);
+        expect(transformer.fields).to.eql(['a', 'b']);
+        expect(lines).to.eql(['a|b', '1|2', '3|4']);
+    });
+    it('maps subsequent object rows using the stored fields', function(){
+        const transformer = tabPlus.getGenerateTransformer();
+        const lines = collectLines(transformer, [['a', 'b'], {b: '2', a: '1'}]);
+        expect(lines).to.eql(['a|b', '1|2']);
+    });
+    it('reports generate errors through the callback instead of throwing', function(){
+        const transformer = tabPlus.getGenerateTransformer();
+        collectLines(transformer, [['a']]);
+        let captured: Error | null = null;
+        transformer([Symbol('other')], function(err){ captured = err; });
+        expect(captured).to.be.an(Error);
+    });
+});
+
+describe('transformers with parallel-transform', function(){
+    it('parses a stream of lines', function(done){
+        const transformer = tabPlus.getParseTransformer({objectRows: true});
+        const parseStream = parallelTransform(10, transformer);
+        const rows: tabPlus.RowObject[] = [];
+        parseStream.on('data', function(row: tabPlus.RowObject){ rows.push(row); });
+        parseStream.on('error', done);
+        parseStream.on('end', function(){
+            expect(transformer.fields).to.eql(['a', 'b']);
+            expect(rows).to.eql([{a: '1', b: '2'}, {a: '3', b: '4'}]);
+            done();
+        });
+        ['a|b', '---|---', '', '1|2', '3|4'].forEach(function(line){ parseStream.write(line); });
+        parseStream.end();
+    });
+    it('generates a stream of lines that joins into the same text as generateTab', function(done){
+        const transformer = tabPlus.getGenerateTransformer();
+        const generateStream = parallelTransform(10, transformer);
+        let text = '';
+        generateStream.on('data', function(lines: string | string[]){
+            (Array.isArray(lines) ? lines : [lines]).forEach(function(line){ text += line + '\r\n'; });
+        });
+        generateStream.on('error', done);
+        generateStream.on('end', function(){
+            expect(text).to.eql(tabPlus.generateTab({fields: ['a', 'b'], rows: [{a: '1', b: '2'}, {a: '3', b: '4'}]}));
+            done();
+        });
+        [{a: '1', b: '2'}, {a: '3', b: '4'}].forEach(function(row){ generateStream.write(row); });
+        generateStream.end();
+    });
+});
+
+// adapts LineSplitter's {line, eol} (Buffer) output into plain strings
+function lineElementToString(): stream.Transform {
+    return new stream.Transform({
+        readableObjectMode: true,
+        writableObjectMode: true,
+        transform(chunk: LineElement, _encoding, callback){
+            callback(null, chunk.line.toString('utf-8'));
+        }
+    });
+}
+
+// adapts plain strings back into LineJoiner's {line, eol} (Buffer) input
+function stringToLineElement(): stream.Transform {
+    return new stream.Transform({
+        readableObjectMode: true,
+        writableObjectMode: true,
+        transform(line: string, _encoding, callback){
+            callback(null, {line: Buffer.from(line, 'utf-8'), eol: Buffer.from('\r\n')} as LineElement);
+        }
+    });
+}
+
+// flattens a single generated line or an array of lines (the header+first-row case in object mode) into
+// individual chunks pushed downstream
+function flattenLines(): stream.Transform {
+    return new stream.Transform({
+        readableObjectMode: true,
+        writableObjectMode: true,
+        transform(this: stream.Transform, lines: string | string[], _encoding, callback){
+            (Array.isArray(lines) ? lines : [lines]).forEach(function(line){ this.push(line); }, this);
+            callback();
+        }
+    });
+}
+
+function collectText(readable: stream.Readable, done: (text: string) => void): void {
+    const chunks: Buffer[] = [];
+    const output = new stream.Writable({
+        write(chunk: Buffer, _encoding, callback){
+            chunks.push(chunk);
+            callback();
+        }
+    });
+    readable.pipe(output);
+    output.on('finish', function(){ done(Buffer.concat(chunks).toString('utf-8')); });
+}
+
+function readableFromLines(lines: string[]): stream.Readable {
+    let index = 0;
+    return new stream.Readable({
+        read(){
+            if(index < lines.length){
+                this.push(lines[index++] + '\r\n');
+            }else{
+                this.push(null);
+            }
+        }
+    });
+}
+
+describe('full pipeline: LineSplitter -> transform -> LineJoiner', function(){
+    it('array mode: the header flows as an ordinary row through the business transform', function(done: (err?: Error) => void){
+        const content = 'code|name\r\n1|plain\r\n2|with\\|pipe\r\n';
+
+        // business step: works on plain arrays, oblivious to the tab-plus escaping format; the header is
+        // just another row to it, symmetric on both the parse and the generate side
+        function uppercaseRow(row: FieldValue[], callback: tabPlus.TransformerCallback<FieldValue[]>): void {
+            callback(null, row.map(function(value){
+                return typeof value === 'string' ? value.toUpperCase() : value;
+            }));
+        }
+
+        const output = readableFromLines(content.split(/\r\n/).filter(function(line){ return line !== ''; }))
+            .pipe(new LineSplitter({}))
+            .pipe(lineElementToString())
+            .pipe(parallelTransform(1, tabPlus.getParseTransformer()))
+            .pipe(parallelTransform(1, uppercaseRow))
+            .pipe(parallelTransform(1, tabPlus.getGenerateTransformer()))
+            .pipe(flattenLines())
+            .pipe(stringToLineElement())
+            .pipe(new LineJoiner({}));
+
+        collectText(output, function(text){
+            expect(text).to.eql('CODE|NAME\r\n1|PLAIN\r\n2|WITH\\x7CPIPE\r\n');
+            expect(tabPlus.parseTab(text)).to.eql({
+                fields: ['CODE', 'NAME'],
+                rows: [['1', 'PLAIN'], ['2', 'WITH|PIPE']]
+            });
+            done();
+        });
+        output.on('error', done);
+    });
+
+    it('object mode: rows carry their field names, no header row needed on either side', function(done: (err?: Error) => void){
+        const content = 'code|name\r\n1|plain\r\n2|with\\|pipe\r\n';
+
+        // business step: works on RowObject values only, oblivious to which fields exist or their order;
+        // unlike array mode, the header never reaches it (it lives in each object's keys, not its values)
+        function uppercaseRow(row: tabPlus.RowObject, callback: tabPlus.TransformerCallback<tabPlus.RowObject>): void {
+            const upperRow: tabPlus.RowObject = {};
+            Object.keys(row).forEach(function(key){
+                const value = row[key];
+                upperRow[key] = typeof value === 'string' ? value.toUpperCase() : value;
+            });
+            callback(null, upperRow);
+        }
+
+        const output = readableFromLines(content.split(/\r\n/).filter(function(line){ return line !== ''; }))
+            .pipe(new LineSplitter({}))
+            .pipe(lineElementToString())
+            .pipe(parallelTransform(1, tabPlus.getParseTransformer({objectRows: true})))
+            .pipe(parallelTransform(1, uppercaseRow))
+            .pipe(parallelTransform(1, tabPlus.getGenerateTransformer()))
+            .pipe(flattenLines())
+            .pipe(stringToLineElement())
+            .pipe(new LineJoiner({}));
+
+        collectText(output, function(text){
+            expect(text).to.eql('code|name\r\n1|PLAIN\r\n2|WITH\\x7CPIPE\r\n');
+            expect(tabPlus.parseTab(text, {objectRows: true})).to.eql({
+                fields: ['code', 'name'],
+                rows: [{code: '1', name: 'PLAIN'}, {code: '2', name: 'WITH|PIPE'}]
+            });
+            done();
+        });
+        output.on('error', done);
     });
 });

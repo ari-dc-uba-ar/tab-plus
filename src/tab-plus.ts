@@ -126,43 +126,135 @@ function rowToObject(fields: FieldValue[], row: FieldValue[]): RowObject {
     return obj;
 }
 
+function objectRowToArray(fields: FieldValue[], row: RowObject): (FieldValue | undefined)[] {
+    return fields.map(function(field){
+        return row[typeof field === 'string' ? field : String(field)];
+    });
+}
+
+// parses one raw line, or returns null if it must be skipped (comment, blank or lone empty field)
+function parseDataLine(line: string, options?: Options): FieldValue[] | null {
+    if(commentOrBlankLine.test(line)){
+        return null;
+    }
+    const row = parseRow(line, options);
+    if(row.length === 1 && typeof row[0] === 'string' && row[0].trim() === ''){
+        return null;
+    }
+    return row;
+}
+
+function asError(err: unknown): Error {
+    return err instanceof Error ? err : new Error(String(err));
+}
+
+// the transformers below follow the (data, callback) contract expected by parallel-transform:
+// callback(err) reports an error, callback(null, null) emits nothing, callback(null, data) emits data
+export type TransformerCallback<T> = (err: Error | null, data?: T | null) => void;
+
+export interface ParseTransformer<T extends FieldValue[] | RowObject = FieldValue[] | RowObject> {
+    (line: string, callback: TransformerCallback<T>): void;
+    fields: FieldValue[] | null;
+}
+
+export interface GenerateTransformer {
+    (row: (FieldValue | undefined)[] | RowObject, callback: TransformerCallback<string | string[]>): void;
+    fields: FieldValue[] | null;
+}
+
+// returns a stateful line-by-line parser: the first real line (not comment/blank, BOM stripped) is kept
+// as `fields`. In array mode (the default) that first line is also emitted as the first row, symmetric with
+// getGenerateTransformer's array mode (which likewise expects the header as its first row); in object mode
+// it is not re-emitted, since every emitted object already carries the field names as its own keys.
+export function getParseTransformer(options?: Options & {objectRows?: false}): ParseTransformer<FieldValue[]>;
+export function getParseTransformer(options: Options & {objectRows: true}): ParseTransformer<RowObject>;
+export function getParseTransformer(options?: Options): ParseTransformer;
+export function getParseTransformer(options?: Options): ParseTransformer {
+    const transformer: ParseTransformer = Object.assign(
+        function(line: string, callback: TransformerCallback<FieldValue[] | RowObject>): void {
+            try{
+                const row = parseDataLine(line, options);
+                if(row === null){
+                    return callback(null, null);
+                }
+                if(transformer.fields === null){
+                    const firstField = row[0];
+                    if(typeof firstField === 'string' && firstField.charCodeAt(0) === 0xfeff){
+                        row[0] = firstField.slice(1);
+                    }
+                    transformer.fields = row;
+                    return callback(null, options && options.objectRows ? null : row);
+                }
+                return callback(null, options && options.objectRows ? rowToObject(transformer.fields, row) : row);
+            }catch(err){
+                return callback(asError(err));
+            }
+        },
+        {fields: null as FieldValue[] | null}
+    );
+    return transformer;
+}
+
+// returns the opposite stateful transformer: receives one row per call and emits the line(s) of text,
+// without line terminator. The first call defines `fields`: an array is the header itself (emits one
+// line); an object serves both as header (its keys) and as data (emits [header line, data line])
+export function getGenerateTransformer(options?: Options): GenerateTransformer {
+    const transformer: GenerateTransformer = Object.assign(
+        function(row: (FieldValue | undefined)[] | RowObject, callback: TransformerCallback<string | string[]>): void {
+            try{
+                if(transformer.fields === null){
+                    if(Array.isArray(row)){
+                        transformer.fields = row.map(function(value){ return value === undefined ? null : value; });
+                        return callback(null, generateRow(row, options));
+                    }
+                    const fields: FieldValue[] = Object.keys(row);
+                    transformer.fields = fields;
+                    return callback(null, [generateRow(fields, options), generateRow(objectRowToArray(fields, row), options)]);
+                }
+                return callback(null, generateRow(Array.isArray(row) ? row : objectRowToArray(transformer.fields, row), options));
+            }catch(err){
+                return callback(asError(err));
+            }
+        },
+        {fields: null as FieldValue[] | null}
+    );
+    return transformer;
+}
+
 // parses the full content of a .tab file into {fields, rows}
 export function parseTab(text: string, options?: Options & {objectRows?: false}): Tab;
 export function parseTab(text: string, options: Options & {objectRows: true}): ObjectTab;
 export function parseTab(text: string, options?: Options): Tab | ObjectTab {
-    const lines = String(text).split(/\r?\n/)
-        .filter(function(line){ return !commentOrBlankLine.test(line); })
-        .map(function(line){ return parseRow(line, options); })
-        .filter(function(row){ return row.length > 1 || (row.length === 1 && (typeof row[0] !== 'string' || row[0].trim() !== '')); });
-    if(lines.length === 0){
-        return {fields: [], rows: []};
-    }
-    const firstField = lines[0][0];
-    if(typeof firstField === 'string' && firstField.charCodeAt(0) === 0xfeff){
-        lines[0][0] = firstField.slice(1);
-    }
-    const fields = lines[0];
-    const dataRows = lines.slice(1);
-    if(options && options.objectRows){
-        return {fields: fields, rows: dataRows.map(function(row){ return rowToObject(fields, row); })};
-    }
-    return {fields: fields, rows: dataRows};
+    const transformer = getParseTransformer(options);
+    const rows: (FieldValue[] | RowObject)[] = [];
+    String(text).split(/\r?\n/).forEach(function(line){
+        transformer(line, function(err, row){
+            if(err){ throw err; }
+            // in array mode the transformer emits the header as the first row too; skip it here, it is
+            // already available as transformer.fields
+            if(row != null && row !== transformer.fields){ rows.push(row); }
+        });
+    });
+    // the transformer emits rows homogeneous with options.objectRows, so the union collapses to Tab or ObjectTab
+    return {fields: transformer.fields || [], rows: rows} as Tab | ObjectTab;
 }
 
 // generates the full content of a .tab file from {fields, rows} (rows can be arrays or, as returned by
 // parseTab with objectRows:true, objects keyed by field name)
 export function generateTab(tab: Tab | ObjectTab, options?: Options): string {
-    const rows = tab.rows.map(function(row){
-        if(Array.isArray(row)){
-            return row;
+    const transformer = getGenerateTransformer(options);
+    let result = '';
+    function append(err: Error | null, lines?: string | string[] | null): void {
+        if(err){ throw err; }
+        if(lines != null){
+            (Array.isArray(lines) ? lines : [lines]).forEach(function(line){
+                result += line + '\r\n';
+            });
         }
-        return tab.fields.map(function(field){
-            return row[typeof field === 'string' ? field : String(field)];
-        });
+    }
+    transformer(tab.fields, append);
+    tab.rows.forEach(function(row){
+        transformer(row, append);
     });
-    return [tab.fields].concat(rows).map(function(row){
-        return generateRow(row, options);
-    }).map(function(line){
-        return line + '\r\n';
-    }).join('');
+    return result;
 }
