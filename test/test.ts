@@ -1,6 +1,7 @@
 import expect = require('expect.js');
 import fs = require('fs');
 import path = require('path');
+import os = require('os');
 import stream = require('stream');
 import parallelTransform = require('parallel-transform');
 import {LineSplitter, LineJoiner, LineElement} from 'line-splitter';
@@ -206,10 +207,9 @@ describe('generateTab', function(){
         const text = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2']]}, {eol: '\n'});
         expect(text).to.eql('a|b\n1|2\n');
     });
-    it('defaults to a line ending, consistently for the whole file, when options.eol is not given', function(){
+    it('defaults to the OS-native line ending, consistently for the whole file, when options.eol is not given', function(){
         const text = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2'], ['3', '4']]});
-        const eol = /\r\n/.test(text) ? '\r\n' : '\n';
-        expect(text).to.eql(['a|b', '1|2', '3|4', ''].join(eol));
+        expect(text).to.eql(['a|b', '1|2', '3|4', ''].join(os.EOL));
     });
 });
 
@@ -315,11 +315,13 @@ describe('transformers with parallel-transform', function(){
         parseStream.end();
     });
     it('generates a stream of lines that joins into the same text as generateTab', function(done){
+        // generateTab defaults to the OS-native eol; match it here instead of pinning either side to a fixed value
+        const eol = os.EOL;
         const transformer = tabPlus.getGenerateTransformer();
         const generateStream = parallelTransform(10, transformer);
         let text = '';
         generateStream.on('data', function(lines: string | string[]){
-            (Array.isArray(lines) ? lines : [lines]).forEach(function(line){ text += line + '\r\n'; });
+            (Array.isArray(lines) ? lines : [lines]).forEach(function(line){ text += line + eol; });
         });
         generateStream.on('error', done);
         generateStream.on('end', function(){
