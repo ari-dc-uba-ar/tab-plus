@@ -28,6 +28,7 @@
     "expect.js": "^0.3.1",
     "mocha": "^11.7.6",
     "multilang": "^1.2.3",
+    "nyc": "^18.0.0",
     "qa-control": "^0.7.5",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2"
@@ -39,7 +40,8 @@
     "build": "tsc -p .",
     "pretest": "npm run build",
     "test": "mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts",
-    "test-ci": "npm test",
+    "pretest-ci": "npm run build",
+    "test-ci": "nyc mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts",
     "docs": "multilang --check --verbose LEEME.md && multilang LEEME.md"
   },
   "qa-control": {
@@ -49,5 +51,10 @@
     "silenced": [
       "first_lines_does_not_match_in_file_1"
     ]
+  },
+  "nyc": {
+    "extension": [".ts"],
+    "include": ["src/**/*.ts"],
+    "reporter": ["text", "lcov", "html"]
   }
 }
