@@ -4,7 +4,7 @@
   "version": "0.1.4",
   "author": "Codenautas <codenautas@googlegroups.com>",
   "license": "MIT",
-  "repository": "codenautas/tab-plus",
+  "repository": "ari-dc-uba-ar/tab-plus",
   "main": "dist/tab-plus.js",
   "types": "dist/tab-plus.d.ts",
   "files": [
