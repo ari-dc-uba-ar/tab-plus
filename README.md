@@ -15,6 +15,41 @@ language: ![English](https://raw.githubusercontent.com/codenautas/multilang/mast
 also available in:
 [![Spanish](https://raw.githubusercontent.com/codenautas/multilang/master/img/lang-es.png)](LEEME.md)
 
+## Use
+
+Suppose we have the following file
+```ts
+c2|c3|num|en_name|sp_name
+AF|AFG|004|Afghanistan|Afganistán
+AL|ALB|008|Albania|Albania
+DE|DEU|276|Germany|Alemania
+AD|AND|020|Andorra|Andorra
+AO|AGO|024|Angola|Angola
+AI|AIA|660|Anguila|Anguila
+AG|ATG|028|Antigua y Barbuda|Antigua and Barbuda
+SA|SAU|682|Saudi Arabia|Arabia Saudita
+DZ|DZA|012|Argelia|Algeria
+AR|ARG|032|Argentina|Argentina
+```
+
+Let's load the file, make some changes and save it back
+```ts
+import { parseTab, generateTab } from "tab-plus";
+import * as fs from "fs/promise";
+
+var textContent = await fs.readFile('countries.tab', 'utf-8');
+var info = parseTab(textContent)
+
+console.log(info);
+var orderedInfo = {
+  fields: info.fields,
+  rows: sortArrayOfArrays(info.rows)
+}
+
+var textToSave = generateTab(orderedInfo);
+await fs.writeFile(textToSave, 'utf-8');
+```
+
 ## Why `.tab`
 
 `.tab` is the safest format for exchanging tabular data when you don't know for sure who is going to read it.
@@ -38,30 +73,25 @@ more serious, silent failures: split records, shifted columns, wrong row counts.
 such a well-known format, it's common for it to be implemented "by hand" naively, trusting that splitting on
 commas is enough.
 
-## The `.tab` format
+## The `tab-plus` format
 
 * Records are separated by lines (`\r\n` or `\n`).
 * Fields within a record are separated by `|`.
 * The first record is the header (field names); the rest are data rows.
 * `\` is the escape character. It can produce:
-  * `\t`, `\r`, `\n`, `\s` for tab, carriage return, line feed and space.
-  * `\xHH` for any byte, given as a 1 or 2 digit hex code (e.g. `\x7C` is `|`).
-  * `\` followed by any other character yields that character literally (so `\\` is `\` and `\|` is `|`).
-* Lines made up only of `-`, `|` and spaces (e.g. a markdown-style `---|---` divider) and blank lines are ignored,
-  so `.tab` files can be written to look like a readable table.
+  * `\t`, `\r`, `\n`, `\s`, `\\` for tab, carriage return, line feed, space and the backslash itself.
+  * `\xHH` for any byte, given as a 2 digit hex code (this is mandatory for `|`, whose code is `\x7C`, and
+    recommended for special characters that are not in the list above, are not standard UTF-8, or are not
+    visible/printable).
+  * `\E` and `\N` can only appear as a field's whole value and mean a zero-length string `''` or the value
+    `null` respectively. Two consecutive separators `||` produce the same as `\E` or `\N`, depending on which
+    `emptyField` option is used.
+  * `\` followed by any other character has reserved behavior that may change in future versions (although the
+    current parser yields the character that follows literally, `|` included).
 * Trailing whitespace on a field is trimmed. This trimming happens on the raw (still escaped) text before
   escape sequences are resolved, so it only removes literal trailing spaces/tabs — a trailing `\s` (or any
   other escape sequence) is not affected and is kept in the resulting value.
 * A leading UTF-8 BOM on the first header field is stripped.
-* A field with no content at all, i.e. two adjacent separators (`a||b`) or a field alone on its line, is by
-  default an empty string. This can be changed with the `emptyField` option (see below).
-* `\E` and `\N` are whole-field markers for an explicit empty string and an explicit `null`. They always mean
-  that, regardless of the `emptyField` option.
-
-The **generator** in this library always produces output that is safe to split "raw": splitting the generated
-text by line breaks always separates records, and splitting a line by `|` always separates fields. This means it
-never emits an escaped `|` (`\|`) — a literal `|` in a value is always generated as `\x7C` instead — and every
-`\r`, `\n`, `\\` and tab is always escaped.
 
 ### The `emptyField` option
 
