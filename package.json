@@ -1,7 +1,7 @@
 {
   "name": "tab-plus",
   "description": "parser and generator for the .tab file format used by backend-plus",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "author": "Codenautas <codenautas@googlegroups.com>",
   "license": "MIT",
   "repository": "ari-dc-uba-ar/tab-plus",
