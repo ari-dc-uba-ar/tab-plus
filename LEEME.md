@@ -9,6 +9,54 @@ Parser and generator for the `.tab` file format used by [backend-plus](https://g
 to seed database tables with initial data.
 [!--lang:*-->
 
+<!--lang:es-->
+## Por qué `.tab`
+
+`.tab` es el formato más seguro para intercambiar datos tabulares cuando no se sabe con certeza quién lo va a
+leer. CSV no tiene un estándar único, y sus variantes más comunes permiten, dentro de un campo entre comillas,
+saltos de línea literales. Eso significa que un parser de CSV no puede confiar en los saltos de línea físicos
+del archivo para saber dónde termina cada registro — tiene que llevar la cuenta de si está "dentro" o "fuera"
+de comillas, y hasta contar registros deja de ser trivial sin un parser completo.
+
+En `.tab`, en cambio, un salto de línea físico siempre separa registros y un `|` siempre separa campos
+—ninguno de los dos puede aparecer literal dentro de un valor, porque el generador siempre los reemplaza por
+un código (`\r\n`, `\n` o `\x7C` para el `|` que no es separador). No hace falta llevar ningún estado (como
+contar backslashes) para decidir si un `|` es separador: si aparece tal cual, lo es siempre.
+
+Esta garantía depende, claro, de que quien genera el archivo respete las reglas de escape —ningún formato es
+seguro si el productor no lo respeta. La ventaja de `.tab` está del lado de quien lo *lee* sin cuidado: el peor
+resultado posible de un parser ingenuo (que ni siquiera resuelva los escapes) es encontrar una secuencia como
+`\x7C` en el contenido de un campo en vez del carácter `|` —un defecto cosmético, local a ese campo. Nunca se
+cortan registros, ni se desalinean columnas, ni una fila se mezcla con la siguiente. Con CSV citado, en cambio,
+un parser descuidado ante una coma o un salto de línea dentro de comillas produce fallas mucho más graves y
+silenciosas: registros partidos, columnas corridas, conteos de filas incorrectos. Y precisamente porque CSV es
+un formato tan conocido, es común que se implemente "a mano" de forma ingenua, confiando en que alcanza con
+dividir por comas.
+<!--lang:en--]
+## Why `.tab`
+
+`.tab` is the safest format for exchanging tabular data when you don't know for sure who is going to read it.
+CSV has no single standard, and its most common variants allow literal line breaks inside a quoted field. That
+means a CSV parser can't rely on the file's physical line breaks to know where each record ends — it has to
+keep track of whether it's "inside" or "outside" quotes, and even counting records stops being trivial without
+a full parser.
+
+In `.tab`, on the other hand, a physical line break always separates records and a `|` always separates
+fields — neither can ever appear literally inside a value, because the generator always replaces them with a
+code (`\r\n`, `\n`, or `\x7C` for a `|` that is not a separator). There's no state to keep track of (like
+counting backslashes) to decide whether a `|` is a separator: if it appears as-is, it always is.
+
+This guarantee depends, of course, on whoever generates the file following the escaping rules — no format is
+safe if the producer doesn't follow them. The advantage of `.tab` is on the *reading* side, for careless
+readers: the worst outcome of a naive parser (one that doesn't even resolve escape sequences) is finding a
+sequence like `\x7C` in a field's content instead of the `|` character — a cosmetic defect, local to that
+field. Records never get cut, columns never get misaligned, and one row never bleeds into the next. With
+quoted CSV, on the other hand, a careless parser hitting a comma or a line break inside quotes produces much
+more serious, silent failures: split records, shifted columns, wrong row counts. And precisely because CSV is
+such a well-known format, it's common for it to be implemented "by hand" naively, trusting that splitting on
+commas is enough.
+[!--lang:*-->
+
 <!-- cucardas -->
 [![npm-version](https://img.shields.io/npm/v/tab-plus.svg)](https://npmjs.org/package/tab-plus)
 [![downloads](https://img.shields.io/npm/dm/tab-plus.svg)](https://npmjs.org/package/tab-plus)

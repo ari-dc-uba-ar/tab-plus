@@ -3,6 +3,29 @@
 Parser and generator for the `.tab` file format used by [backend-plus](https://github.com/codenautas/backend-plus)
 to seed database tables with initial data.
 
+## Why `.tab`
+
+`.tab` is the safest format for exchanging tabular data when you don't know for sure who is going to read it.
+CSV has no single standard, and its most common variants allow literal line breaks inside a quoted field. That
+means a CSV parser can't rely on the file's physical line breaks to know where each record ends — it has to
+keep track of whether it's "inside" or "outside" quotes, and even counting records stops being trivial without
+a full parser.
+
+In `.tab`, on the other hand, a physical line break always separates records and a `|` always separates
+fields — neither can ever appear literally inside a value, because the generator always replaces them with a
+code (`\r\n`, `\n`, or `\x7C` for a `|` that is not a separator). There's no state to keep track of (like
+counting backslashes) to decide whether a `|` is a separator: if it appears as-is, it always is.
+
+This guarantee depends, of course, on whoever generates the file following the escaping rules — no format is
+safe if the producer doesn't follow them. The advantage of `.tab` is on the *reading* side, for careless
+readers: the worst outcome of a naive parser (one that doesn't even resolve escape sequences) is finding a
+sequence like `\x7C` in a field's content instead of the `|` character — a cosmetic defect, local to that
+field. Records never get cut, columns never get misaligned, and one row never bleeds into the next. With
+quoted CSV, on the other hand, a careless parser hitting a comma or a line break inside quotes produces much
+more serious, silent failures: split records, shifted columns, wrong row counts. And precisely because CSV is
+such a well-known format, it's common for it to be implemented "by hand" naively, trusting that splitting on
+commas is enough.
+
 [![npm-version](https://img.shields.io/npm/v/tab-plus.svg)](https://npmjs.org/package/tab-plus)
 [![downloads](https://img.shields.io/npm/dm/tab-plus.svg)](https://npmjs.org/package/tab-plus)
 [![build](https://github.com/codenautas/tab-plus/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/codenautas/tab-plus/actions/workflows/build-and-test.yml)
