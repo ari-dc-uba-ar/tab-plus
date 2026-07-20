@@ -2,12 +2,27 @@
 # tab-plus
 
 <!--lang:es-->
-Parser y generador para el formato de archivo `.tab` usado por [backend-plus](https://github.com/codenautas/backend-plus)
-para poblar tablas de base de datos con datos iniciales.
+
+Parser y generador para una variante segura del formato separado por pipe.
+
 <!--lang:en--]
-Parser and generator for the `.tab` file format used by [backend-plus](https://github.com/codenautas/backend-plus)
-to seed database tables with initial data.
+
+Parser and generator for a safe variant of the pipe-separated format.
+
 [!--lang:*-->
+
+<!-- cucardas -->
+[![npm-version](https://img.shields.io/npm/v/tab-plus.svg)](https://npmjs.org/package/tab-plus)
+[![downloads](https://img.shields.io/npm/dm/tab-plus.svg)](https://npmjs.org/package/tab-plus)
+[![build](https://github.com/ari-dc-uba-ar/tab-plus/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/ari-dc-uba-ar/tab-plus/actions/workflows/build-and-test.yml)
+[![security](https://socket.dev/api/badge/npm/package/tab-plus)](https://socket.dev/npm/package/tab-plus)
+[![qa-control](https://github.com/ari-dc-uba-ar/tab-plus/actions/workflows/qa-control.yml/badge.svg)](https://github.com/ari-dc-uba-ar/tab-plus/actions/workflows/qa-control.yml)
+
+<!--multilang buttons-->
+
+idioma: ![castellano](https://raw.githubusercontent.com/codenautas/multilang/master/img/lang-es.png)
+también disponible en:
+[![inglés](https://raw.githubusercontent.com/codenautas/multilang/master/img/lang-en.png)](README.md)
 
 <!--lang:es-->
 ## Por qué `.tab`
@@ -56,19 +71,6 @@ more serious, silent failures: split records, shifted columns, wrong row counts.
 such a well-known format, it's common for it to be implemented "by hand" naively, trusting that splitting on
 commas is enough.
 [!--lang:*-->
-
-<!-- cucardas -->
-[![npm-version](https://img.shields.io/npm/v/tab-plus.svg)](https://npmjs.org/package/tab-plus)
-[![downloads](https://img.shields.io/npm/dm/tab-plus.svg)](https://npmjs.org/package/tab-plus)
-[![build](https://github.com/codenautas/tab-plus/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/codenautas/tab-plus/actions/workflows/build-and-test.yml)
-[![security](https://socket.dev/api/badge/npm/package/tab-plus)](https://socket.dev/npm/package/tab-plus)
-[![qa-control](https://github.com/codenautas/tab-plus/actions/workflows/qa-control.yml/badge.svg)](https://github.com/codenautas/tab-plus/actions/workflows/qa-control.yml)
-
-<!--multilang buttons-->
-
-idioma: ![castellano](https://raw.githubusercontent.com/codenautas/multilang/master/img/lang-es.png)
-también disponible en:
-[![inglés](https://raw.githubusercontent.com/codenautas/multilang/master/img/lang-en.png)](README.md)
 
 <!--lang:es-->
 ## El formato `.tab`
