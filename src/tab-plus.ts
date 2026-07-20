@@ -3,6 +3,23 @@ export type FieldValue = string | null | symbol;
 export interface Options {
     emptyField?: 'string' | 'null' | symbol;
     objectRows?: boolean;
+    eol?: string;
+}
+
+declare const process: {platform: string} | undefined;
+declare const navigator: {platform?: string; userAgent?: string} | undefined;
+
+// options.eol (generateTab/getGenerateTransformer): line ending to join generated lines with. Defaults to
+// the running OS's native ending, detected without a static dependency on Node's `os` module, so this file
+// stays usable unmodified both under Node and bundled for the browser (where there is no such module).
+function detectEol(): string {
+    if(typeof process !== 'undefined' && /^win/i.test(process.platform)){
+        return '\r\n';
+    }
+    if(typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || navigator.userAgent || '')){
+        return '\r\n';
+    }
+    return '\n';
 }
 
 export interface Tab {
@@ -243,12 +260,13 @@ export function parseTab(text: string, options?: Options): Tab | ObjectTab {
 // parseTab with objectRows:true, objects keyed by field name)
 export function generateTab(tab: Tab | ObjectTab, options?: Options): string {
     const transformer = getGenerateTransformer(options);
+    const eol = (options && options.eol) || detectEol();
     let result = '';
     function append(err: Error | null, lines?: string | string[] | null): void {
         if(err){ throw err; }
         if(lines != null){
             (Array.isArray(lines) ? lines : [lines]).forEach(function(line){
-                result += line + '\r\n';
+                result += line + eol;
             });
         }
     }

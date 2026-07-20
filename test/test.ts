@@ -176,8 +176,8 @@ describe('objectRows option', function(){
 });
 
 describe('generateTab', function(){
-    it('generates CRLF-separated lines with a trailing line ending', function(){
-        const text = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2']]});
+    it('generates CRLF-separated lines with a trailing line ending, given options.eol', function(){
+        const text = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2']]}, {eol: '\r\n'});
         expect(text).to.eql('a|b\r\n1|2\r\n');
     });
     it('round-trips arbitrary data through parseTab', function(){
@@ -194,13 +194,22 @@ describe('generateTab', function(){
     });
     it('never emits an unescaped separator character inside a value', function(){
         const tab: tabPlus.Tab = {fields: ['f'], rows: [['line1\nline2\r\nline3|piped\\backslash']]};
-        const text = tabPlus.generateTab(tab);
+        const text = tabPlus.generateTab(tab, {eol: '\r\n'});
         const lines = text.split(/\r\n/).filter(function(line){ return line !== ''; });
         expect(lines.length).to.eql(2);
         lines.forEach(function(line){
             expect(tabPlus.parseRow(line).length).to.be.greaterThan(0);
         });
         expect(tabPlus.parseTab(text)).to.eql(tab);
+    });
+    it('generates \\n-separated lines when options.eol is "\\n"', function(){
+        const text = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2']]}, {eol: '\n'});
+        expect(text).to.eql('a|b\n1|2\n');
+    });
+    it('defaults to a line ending, consistently for the whole file, when options.eol is not given', function(){
+        const text = tabPlus.generateTab({fields: ['a', 'b'], rows: [['1', '2'], ['3', '4']]});
+        const eol = /\r\n/.test(text) ? '\r\n' : '\n';
+        expect(text).to.eql(['a|b', '1|2', '3|4', ''].join(eol));
     });
 });
 
