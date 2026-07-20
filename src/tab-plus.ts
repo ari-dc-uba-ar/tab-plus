@@ -25,6 +25,7 @@ const escapeSequence = /\\([^x]|x[\dA-Za-z]{1,2})/g;
 
 const commentOrBlankLine = /^[-| ]*$/;
 
+// eslint-disable-next-line no-control-regex -- control chars are intentional: this is the list of chars that must be escaped in fields
 const charsNeedingEscape = /[\\|\r\n\t\x00-\x1f\x7f]/g;
 
 // whole-field markers: explicit empty string and explicit null, regardless of the `emptyField` option

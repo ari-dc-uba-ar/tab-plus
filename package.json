@@ -5,34 +5,49 @@
   "author": "Codenautas <codenautas@googlegroups.com>",
   "license": "MIT",
   "repository": "codenautas/tab-plus",
+  "main": "dist/tab-plus.js",
+  "types": "dist/tab-plus.d.ts",
+  "files": [
+    "dist"
+  ],
   "contributors": [
     {
       "name": "Emilio Platzer",
       "email": "emilioplatzer@gmail.com"
     }
   ],
-  "devDependencies": {
-    "@types/expect.js": "~0.3.32",
-    "@types/mocha": "~10.0.10",
-    "@types/node": "~26.1.1",
-    "expect.js": "~0.3.1",
-    "mocha": "~11.7.6",
-    "multilang": "^1.2.3",
-    "tsx": "^4.23.1",
-    "typescript": "~7.0.2"
+  "overrides": {
+    "diff": ">=8.0.2",
+    "serialize-javascript": ">=7.0.0",
+    "uuid": ">=14.0.0"
   },
-  "main": "dist/tab-plus.js",
-  "types": "dist/tab-plus.d.ts",
+  "devDependencies": {
+    "@types/expect.js": "^0.3.32",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^26.1.1",
+    "expect.js": "^0.3.1",
+    "mocha": "^11.7.6",
+    "multilang": "^1.2.3",
+    "qa-control": "^0.7.5",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  },
   "engines": {
-    "node": ">= 12"
+    "node": ">= 22"
   },
   "scripts": {
     "build": "tsc -p .",
     "pretest": "npm run build",
     "test": "mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts",
+    "test-ci": "npm test",
     "docs": "multilang --check --verbose LEEME.md && multilang LEEME.md"
   },
-  "files": [
-    "dist"
-  ]
+  "qa-control": {
+    "gha": "all",
+    "run-in": "both",
+    "type": "lib",
+    "silenced": [
+      "first_lines_does_not_match_in_file_1"
+    ]
+  }
 }
