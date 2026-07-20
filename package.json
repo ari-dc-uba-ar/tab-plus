@@ -1,7 +1,7 @@
 {
   "name": "tab-plus",
   "description": "parser and generator for the .tab file format used by backend-plus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Codenautas <codenautas@googlegroups.com>",
   "license": "MIT",
   "repository": "codenautas/tab-plus",
@@ -53,8 +53,16 @@
     ]
   },
   "nyc": {
-    "extension": [".ts"],
-    "include": ["src/**/*.ts"],
-    "reporter": ["text", "lcov", "html"]
+    "extension": [
+      ".ts"
+    ],
+    "include": [
+      "src/**/*.ts"
+    ],
+    "reporter": [
+      "text",
+      "lcov",
+      "html"
+    ]
   }
 }
