@@ -264,8 +264,9 @@ package is needed.
 <!--lang:es-->
 ## CLI: `tab-plus sparse`
 
-El paquete instala un comando `tab-plus` con un subcomando `sparse` que convierte un archivo `.tab` común en uno
-que usa [columnas esparsas](es-tab-plus.md) para las columnas que casi siempre valen `\N` (`null`) o `false`.
+El paquete instala un comando `tab-plus` con un subcomando `sparse` que convierte un archivo `.tab` en uno que
+usa [columnas esparsas](es-tab-plus.md) para las columnas que casi siempre valen `\N` (`null`) o `false`, usando
+`parseTab`/`generateTab` (y su soporte para `columnDefs`) para leer y escribir el archivo.
 
 ```
 tab-plus sparse ARCHIVO.tab [opciones]
@@ -282,22 +283,25 @@ Opciones:
 * `--under 10%` (por defecto): una columna califica cuando menos del 10% de las filas difieren del valor por
   defecto — umbral relativo.
 * `--under 10`: variante absoluta — la columna califica cuando menos de 10 filas difieren del valor por defecto.
-* `--fixed col1 col2 ...`: fuerza a que esas columnas queden fijas (no esparsas) sin importar el cálculo; el
-  resto de las columnas se decide con `--under` como de costumbre.
-* `--sparse col1 col2 ...`: fuerza a que esas columnas se vuelvan esparsas sin importar el cálculo (se elige
-  como valor por defecto el que menos filas distintas produzca entre `null` y `'false'`); el resto de las
-  columnas se decide con `--under` como de costumbre.
+* `--fixed col1,col2,...`: fuerza a que esas columnas (separadas por coma) queden fijas (no esparsas) sin
+  importar el cálculo. Las columnas no listadas ni en `--fixed` ni en `--sparse` **no** se recalculan con
+  `--under`: quedan tal cual estaban en el archivo original (esparsas o no, con el mismo valor por defecto si ya
+  lo eran).
+* `--sparse col1,col2,...`: fuerza a que esas columnas (separadas por coma) se vuelvan esparsas sin importar el
+  cálculo (se elige como valor por defecto el que menos filas distintas produzca entre `null` y `'false'`). Las
+  columnas no listadas se comportan igual que con `--fixed`: quedan como estaban en el original.
 * `--output archivo.tab`: nombre del archivo de salida.
 
-> **Nota:** este comando escribe el formato de columnas esparsas descripto en [es-tab-plus.md](es-tab-plus.md),
-> pero por ahora es de una sola vía — `tabPlus.parseTab`/`generateTab` todavía no entienden ese formato como tal
-> (ver la nota al pie de ese documento), así que un archivo `-sparse.tab` generado por este comando no se puede
-> volver a leer todavía con la API de la librería respetando los valores por defecto.
+Sin `--fixed` ni `--sparse`, todas las columnas se deciden con `--under` (por defecto 10%).
+
+> El archivo que genera este comando se puede volver a leer con `tabPlus.parseTab` (incluido `columnDefs`), y
+> volver a pasar por `tab-plus sparse` sirve para ajustar la sparseness de columnas puntuales sin tocar el resto.
 <!--lang:en--]
 ## CLI: `tab-plus sparse`
 
-The package installs a `tab-plus` command with a `sparse` subcommand that converts a plain `.tab` file into one
-that uses [sparse columns](tab-plus.md) for the columns that are almost always `\N` (`null`) or `false`.
+The package installs a `tab-plus` command with a `sparse` subcommand that converts a `.tab` file into one that
+uses [sparse columns](tab-plus.md) for the columns that are almost always `\N` (`null`) or `false`, using
+`parseTab`/`generateTab` (and their `columnDefs` support) to read and write the file.
 
 ```
 tab-plus sparse FILE.tab [options]
@@ -313,17 +317,18 @@ Options:
 * `--under 10%` (default): a column qualifies when fewer than 10% of rows differ from the default — relative
   threshold.
 * `--under 10`: absolute variant — the column qualifies when fewer than 10 rows differ from the default.
-* `--fixed col1 col2 ...`: forces those columns to stay fixed (non-sparse) regardless of the computation; every
-  other column is still decided by `--under` as usual.
-* `--sparse col1 col2 ...`: forces those columns to become sparse regardless of the computation (the default is
-  whichever of `null`/`'false'` produces fewer differing rows); every other column is still decided by
-  `--under` as usual.
+* `--fixed col1,col2,...`: forces those (comma-separated) columns to stay fixed (non-sparse) regardless of the
+  computation. Columns named in neither `--fixed` nor `--sparse` are **not** recomputed against `--under`: they
+  stay exactly as they were in the original file (sparse or not, with the same default if they already were).
+* `--sparse col1,col2,...`: forces those (comma-separated) columns to become sparse regardless of the
+  computation (the default is whichever of `null`/`'false'` produces fewer differing rows). Unlisted columns
+  behave the same as with `--fixed`: they stay as they were in the original.
 * `--output file.tab`: output filename.
 
-> **Note:** this command writes the sparse-column format described in [tab-plus.md](tab-plus.md), but for now
-> it is one-way — `tabPlus.parseTab`/`generateTab` don't understand that format yet as such (see the note at
-> the bottom of that document), so a `-sparse.tab` file generated by this command can't be read back yet through
-> the library's API while honoring the declared defaults.
+Without `--fixed` or `--sparse`, every column is decided by `--under` (10% by default).
+
+> The file this command generates can be read back with `tabPlus.parseTab` (`columnDefs` included), and running
+> it through `tab-plus sparse` again lets you adjust specific columns' sparseness without touching the rest.
 [!--lang:*-->
 
 ## API

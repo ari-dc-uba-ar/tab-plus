@@ -150,6 +150,26 @@ describe('sparse columns: generating', function(){
             rows: [['1', 'y'], ['2', null]]
         });
     });
+    it('escapes a literal space in a sparse value as \\s, and round-trips it back through parseTab', function(){
+        const tab: tabPlus.Tab = {
+            fields: ['id', 'status'],
+            columnDefs: {id: {position: 1}, status: {position: 1, sparseDefault: null}},
+            rows: [['1', 'on hold']]
+        };
+        const text = tabPlus.generateTab(tab, {eol: '\r\n'});
+        expect(text).to.eql('id|\\: status\r\n1|status:on\\shold\r\n');
+        expect(tabPlus.parseTab(text)).to.eql(tab);
+    });
+    it('escapes a literal space in a sparse column\'s declared default, and round-trips it back through parseTab', function(){
+        const tab: tabPlus.Tab = {
+            fields: ['id', 'status'],
+            columnDefs: {id: {position: 1}, status: {position: 1, sparseDefault: 'not applicable'}},
+            rows: [['1', 'not applicable'], ['2', 'on hold']]
+        };
+        const text = tabPlus.generateTab(tab, {eol: '\r\n'});
+        expect(text).to.eql('id|\\: status:not\\sapplicable\r\n1|\r\n2|status:on\\shold\r\n');
+        expect(tabPlus.parseTab(text)).to.eql(tab);
+    });
 });
 
 describe('sparse columns: parseRow/generateRow with an explicit columnDefs', function(){

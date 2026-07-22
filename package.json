@@ -25,6 +25,9 @@
     "serialize-javascript": ">=7.0.0",
     "uuid": ">=14.0.0"
   },
+  "dependencies": {
+    "cleye": "^2.6.0"
+  },
   "devDependencies": {
     "@types/expect.js": "^0.3.32",
     "@types/mocha": "^10.0.10",
@@ -46,9 +49,9 @@
   "scripts": {
     "build": "tsc -p src",
     "pretest": "npm run build",
-    "test": "mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts",
+    "test": "mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts test/cli.ts",
     "pretest-ci": "npm run build",
-    "test-ci": "nyc mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts",
+    "test-ci": "nyc mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts test/cli.ts",
     "docs": "multilang --check --verbose LEEME.md && multilang LEEME.md"
   },
   "qa-control": {

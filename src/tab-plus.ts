@@ -226,7 +226,7 @@ function generateSparseBlock(values: Map<string, FieldValue | undefined>, sparse
     return sparseFields.filter(function(field){
         return values.get(field) !== columnDefs[field].sparseDefault;
     }).map(function(field){
-        return escapeField(field).replace(/ /g, '\\s') + ':' + escapeField(values.get(field));
+        return escapeField(field).replace(/ /g, '\\s') + ':' + escapeField(values.get(field)).replace(/ /g, '\\s');
     }).join(' ');
 }
 
@@ -367,7 +367,7 @@ function generateHeaderFields(fields: FieldValue[], columnDefs: ColumnDefs, opti
     const sparseRaw = sparse.map(function(field){
         const rawName = escapeField(field).replace(/ /g, '\\s');
         const sparseDefault = columnDefs[field].sparseDefault!;
-        return sparseDefault === null ? rawName : rawName + ':' + escapeField(sparseDefault, options);
+        return sparseDefault === null ? rawName : rawName + ':' + escapeField(sparseDefault, options).replace(/ /g, '\\s');
     });
     return commonRaw.concat(['\\: ' + sparseRaw.join(' ')]).join('|');
 }

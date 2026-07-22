@@ -7,7 +7,6 @@ import parallelTransform = require('parallel-transform');
 import {LineSplitter, LineJoiner, LineElement} from 'line-splitter';
 import * as tabPlus from '../src/tab-plus';
 import {FieldValue} from '../src/tab-plus';
-import {runSparse} from '../src/cli';
 
 describe('parseRow', function(){
     const fixtures: [string, FieldValue[]][] = [
@@ -460,114 +459,5 @@ describe('full pipeline: LineSplitter -> transform -> LineJoiner', function(){
             done();
         });
         output.on('error', done);
-    });
-});
-
-describe('cli sparse', function(){
-    let dir: string;
-
-    beforeEach(function(){
-        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tab-plus-cli-'));
-    });
-
-    afterEach(function(){
-        fs.rmSync(dir, {recursive: true, force: true});
-    });
-
-    function writeInput(name: string, fields: string[], rows: FieldValue[][]): string {
-        const file = path.join(dir, name);
-        fs.writeFileSync(file, tabPlus.generateTab({fields, rows}), 'utf-8');
-        return file;
-    }
-
-    function readOutput(name: string): string {
-        return fs.readFileSync(path.join(dir, name), 'utf-8');
-    }
-
-    // 20 rows: 'mediterraneo' differs from 'false' on 1 row (5%, under the default 10%);
-    // 'estrellas' differs from null on 2 rows (10%, not under the default 10%)
-    function countryRows(): FieldValue[][] {
-        const rows: FieldValue[][] = [];
-        for(let i = 0; i < 20; i++){
-            rows.push([
-                'c' + i,
-                i === 9 ? '3' : i === 11 ? '1' : null,
-                i === 3 ? 'true' : 'false'
-            ]);
-        }
-        return rows;
-    }
-
-    it('moves a column that is mostly "false" into a sparse trailing column, by default', function(){
-        writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
-        runSparse([path.join(dir, 'countries.tab')]);
-        const tab = tabPlus.parseTab(readOutput('countries-sparse.tab'));
-        expect(tab.fields).to.eql(['c2', 'estrellas', ': mediterraneo:false']);
-        expect(tab.rows[3]).to.eql(['c3', null, 'mediterraneo:true']);
-        expect(tab.rows[0]).to.eql(['c0', null, '']);
-    });
-
-    it('leaves a column at exactly the threshold as a regular column (strictly under, not under-or-equal)', function(){
-        writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
-        runSparse([path.join(dir, 'countries.tab')]);
-        const tab = tabPlus.parseTab(readOutput('countries-sparse.tab'));
-        expect(tab.fields).to.contain('estrellas');
-    });
-
-    it('--under with a lower relative percentage makes an otherwise-regular column sparse too', function(){
-        writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
-        runSparse([path.join(dir, 'countries.tab'), '--under', '15%']);
-        const tab = tabPlus.parseTab(readOutput('countries-sparse.tab'));
-        expect(tab.fields).to.eql(['c2', ': estrellas mediterraneo:false']);
-        expect(tab.rows[9]).to.eql(['c9', 'estrellas:3']);
-    });
-
-    it('--under with an absolute count uses a plain row count instead of a percentage', function(){
-        writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
-        runSparse([path.join(dir, 'countries.tab'), '--under', '3']);
-        const tab = tabPlus.parseTab(readOutput('countries-sparse.tab'));
-        expect(tab.fields).to.eql(['c2', ': estrellas mediterraneo:false']);
-    });
-
-    it('--fixed forces a column to stay regular even if it would otherwise qualify', function(){
-        writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
-        runSparse([path.join(dir, 'countries.tab'), '--fixed', 'mediterraneo']);
-        const tab = tabPlus.parseTab(readOutput('countries-sparse.tab'));
-        expect(tab.fields).to.eql(['c2', 'estrellas', 'mediterraneo']);
-    });
-
-    it('--sparse forces a column to become sparse even if it would not otherwise qualify', function(){
-        writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
-        runSparse([path.join(dir, 'countries.tab'), '--sparse', 'c2']);
-        const tab = tabPlus.parseTab(readOutput('countries-sparse.tab'));
-        expect(tab.fields).to.eql(['estrellas', ': c2 mediterraneo:false']);
-        expect(tab.rows[0]).to.eql([null, 'c2:c0']);
-    });
-
-    it('escapes a literal space in a sparse value as \\s', function(){
-        writeInput('statuses.tab', ['id', 'status'],
-            [...Array(10)].map(function(_, i){ return ['id' + i, null] as FieldValue[]; })
-                .concat([['id10', 'on hold']]));
-        runSparse([path.join(dir, 'statuses.tab'), '--under', '15%']);
-        const raw = readOutput('statuses-sparse.tab');
-        expect(raw).to.contain('status:on\\shold');
-    });
-
-    it('--output picks the output filename instead of the default "-sparse" suffix', function(){
-        writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
-        runSparse([path.join(dir, 'countries.tab'), '--output', path.join(dir, 'custom.tab')]);
-        expect(fs.existsSync(path.join(dir, 'custom.tab'))).to.be(true);
-        expect(fs.existsSync(path.join(dir, 'countries-sparse.tab'))).to.be(false);
-    });
-
-    it('throws when the filename is missing', function(){
-        expect(function(){ runSparse([]); }).to.throwError(/missing FILENAME/);
-    });
-
-    it('throws when a column is listed in both --fixed and --sparse', function(){
-        writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
-        expect(function(){
-            runSparse([path.join(dir, 'countries.tab'), '--fixed', 'c2', '--sparse', 'c2']);
-        }).to.throwError(/both --fixed and --sparse/);
     });
 });
