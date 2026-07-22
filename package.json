@@ -46,9 +46,9 @@
   "scripts": {
     "build": "tsc -p src",
     "pretest": "npm run build",
-    "test": "mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts",
+    "test": "mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts",
     "pretest-ci": "npm run build",
-    "test-ci": "nyc mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts",
+    "test-ci": "nyc mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts",
     "docs": "multilang --check --verbose LEEME.md && multilang LEEME.md"
   },
   "qa-control": {
@@ -56,7 +56,8 @@
     "run-in": "both",
     "type": "lib",
     "silenced": [
-      "first_lines_does_not_match_in_file_1"
+      "first_lines_does_not_match_in_file_1",
+      "eslint_warnings_in_file_1"
     ]
   },
   "nyc": {
