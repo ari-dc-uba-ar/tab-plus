@@ -5,6 +5,13 @@
 # Sparse columns in `tab-plus`
 [!--lang:*-->
 
+<!--multilang buttons-->
+
+idioma: ![castellano](https://raw.githubusercontent.com/codenautas/multilang/master/img/lang-es.png)
+también disponible en:
+[![inglés](https://raw.githubusercontent.com/codenautas/multilang/master/img/lang-en.png)](tab-plus.md)
+
+
 <!--lang:es-->
 ## Caso de uso
 <!--lang:en--]
@@ -132,7 +139,9 @@ que no son específicas de columnas esparsas (por ejemplo, una fila con más o m
   * `unknownColumn: string` — nombre de la columna de columnas no especificadas, donde van a parar los pares
     no declarados en el encabezado. Esa columna existe en todas las filas (con el valor por defecto `null`
     cuando no hay ninguna en esa fila) y, cuando sí las hay, contiene el texto crudo tal cual aparecería en la
-    sintaxis esparsa: `'columnaNoDeclarada1:valor1 columnaNoDeclarada2:valor2'`.
+    sintaxis esparsa: `'columnaNoDeclarada1:valor1 columnaNoDeclarada2:valor2'`. Al generar, el valor que se
+    ponga en esa columna debe respetar ese mismo formato (`generateTab`/`generateRow` no lo vuelven a
+    escapar ni a validar, lo insertan tal cual en el bloque esparso).
 
 El paquete exporta `tabPlus.permissiveOptions`, un objeto con valores sugeridos para el modo permisivo, listo
 para mezclar en `options`.
@@ -151,7 +160,9 @@ specific to sparse columns (for example, a row with more or fewer fields than `f
   * `unknownColumn: string` — name of the unspecified-columns column, where undeclared pairs land. That
     column exists on every row (with the default value `null` when there are none on that row) and, when
     there are, holds the raw text exactly as it would appear in sparse syntax:
-    `'undeclaredColumn1:value1 undeclaredColumn2:value2'`.
+    `'undeclaredColumn1:value1 undeclaredColumn2:value2'`. When generating, whatever value is put in that
+    column must follow that same format (`generateTab`/`generateRow` don't re-escape or validate it, they
+    insert it as-is into the sparse block).
 
 The package exports `tabPlus.permissiveOptions`, an object with suggested values for permissive mode, ready to
 mix into `options`.
@@ -164,31 +175,56 @@ tabPlus.parseTab(text, {...tabPlus.permissiveOptions});
 <!--lang:es-->
 ## `columnDefs`
 
-`parseTab` devuelve, además de `fields` y `rows`, un `columnDefs`: un objeto con una entrada por cada columna
-—tanto las columnas comunes como las esparsas— usando el nombre de columna como clave. `fields` incluye a
-todas las columnas por igual, esparsas o no (ver la nota sobre esto en la sección de sintaxis).
+Cuando el encabezado declara al menos una columna esparsa, `parseTab` devuelve, además de `fields` y `rows`,
+un `columnDefs`: un objeto con una entrada por cada columna —tanto las columnas comunes como las esparsas—
+usando el nombre de columna como clave. Cuando el encabezado no declara ninguna columna esparsa, `columnDefs`
+no se incluye en el resultado (el resultado de `parseTab` es idéntico al de antes de que existiera este
+mecanismo). `fields` incluye a todas las columnas por igual, esparsas o no (ver la nota sobre esto en la
+sección de sintaxis), y sigue existiendo por retrocompatibilidad y para manipular los datos ya parseados con
+otras herramientas (poblar una planilla, generar HTML, etc); las funciones que trabajan con filas
+(`parseRow`/`generateRow`) no necesitan `fields`, les alcanza con `columnDefs`.
 
-* una columna común (no esparsa) tiene como valor un objeto vacío `{}`.
-* una columna esparsa tiene como valor `{sparseDefault: valor}`, con el valor por defecto declarado en el
-  encabezado para esa columna (`null` si no llevaba sufijo `:valor`).
+Cada entrada de `columnDefs` lleva un `position`, que empieza en 1 y numera las columnas comunes y las
+esparsas por separado, cada grupo en el orden en que aparecen en el encabezado (por ejemplo, con 5 columnas
+comunes seguidas de 2 esparsas, las comunes tienen `position` 1 a 5 y las esparsas, por separado, `position` 1
+y 2). Ese `position` es lo que fija el orden de los valores dentro de una fila y el orden de los pares dentro
+del bloque esparso al generar.
 
-`generateTab` recibe `columnDefs` de la misma forma (junto con `fields` y `rows`) para saber qué columnas debe
-emitir como esparsas y con qué valor por defecto. Si una columna presente en `fields`/`rows` no tiene entrada
-en `columnDefs`, `generateTab` la trata como esparsa con `sparseDefault: null`.
+* una columna común (no esparsa) tiene como valor `{position: number}`.
+* una columna esparsa tiene como valor `{position: number, sparseDefault: valor}`, con el valor por defecto
+  declarado en el encabezado para esa columna (`null` si no llevaba sufijo `:valor`).
+
+`generateTab` acepta `columnDefs` de la misma forma (junto con `rows`), de forma igualmente opcional: sin
+`columnDefs`, genera un `.tab` común, sin ninguna columna esparsa (retrocompatible con el formato de antes de
+este mecanismo). Con `columnDefs`, lo usa para saber con qué orden y valor por defecto debe emitir cada
+columna, como común o como esparsa; una columna presente en `fields` pero sin entrada en ese `columnDefs` se
+trata como esparsa con `sparseDefault: null`.
 <!--lang:en--]
 ## `columnDefs`
 
-Besides `fields` and `rows`, `parseTab` returns a `columnDefs`: an object with one entry per column — both
-regular and sparse columns — keyed by column name. `fields` includes every column alike, sparse or not (see
-the note about this in the syntax section).
+When the header declares at least one sparse column, `parseTab` returns, besides `fields` and `rows`, a
+`columnDefs`: an object with one entry per column — both regular and sparse columns — keyed by column name.
+When the header declares no sparse column, `columnDefs` is left out of the result (parseTab's result is
+identical to before this mechanism existed). `fields` includes every column alike, sparse or not (see the note
+about this in the syntax section), and it still exists for backwards compatibility and for handling
+already-parsed data with other tools (populating a spreadsheet, generating HTML, etc); the functions that work
+with rows (`parseRow`/`generateRow`) don't need `fields`, `columnDefs` is enough for them.
 
-* a regular (non-sparse) column has an empty object `{}` as its value.
-* a sparse column has `{sparseDefault: value}` as its value, with the default value declared in the header for
-  that column (`null` if it had no `:value` suffix).
+Every `columnDefs` entry carries a `position`, starting at 1 and numbering regular and sparse columns
+separately, each group in the order it appears in the header (for example, with 5 regular columns followed by
+2 sparse ones, the regular columns have `position` 1 through 5 and the sparse ones, separately, `position` 1
+and 2). That `position` is what fixes the order of values within a row, and the order of pairs within the
+sparse block when generating.
 
-`generateTab` receives `columnDefs` the same way (alongside `fields` and `rows`) to know which columns to emit
-as sparse and with which default value. If a column present in `fields`/`rows` has no entry in `columnDefs`,
-`generateTab` treats it as sparse with `sparseDefault: null`.
+* a regular (non-sparse) column has `{position: number}` as its value.
+* a sparse column has `{position: number, sparseDefault: value}` as its value, with the default value
+  declared in the header for that column (`null` if it had no `:value` suffix).
+
+`generateTab` accepts `columnDefs` the same way (alongside `rows`), just as optionally: without `columnDefs`,
+it generates a plain `.tab`, with no sparse columns at all (backwards compatible with the format before this
+mechanism). With `columnDefs`, it uses it to know with what order and default value it must emit each column,
+as regular or as sparse; a column present in `fields` but with no entry in that `columnDefs` is treated as
+sparse with `sparseDefault: null`.
 [!--lang:*-->
 
 ```js
@@ -200,21 +236,11 @@ tabPlus.parseTab(
 {
   fields: ['c2', 'c3', 'num', 'en_name', 'sp_name', 'estrellas', 'mediterraneo'],
   columnDefs: {
-    c2: {}, c3: {}, num: {}, en_name: {}, sp_name: {},
-    estrellas: {sparseDefault: null},
-    mediterraneo: {sparseDefault: 'false'}
+    c2: {position: 1}, c3: {position: 2}, num: {position: 3}, en_name: {position: 4}, sp_name: {position: 5},
+    estrellas: {position: 1, sparseDefault: null},
+    mediterraneo: {position: 2, sparseDefault: 'false'}
   },
   rows: [['AR', 'ARG', '032', 'Argentina', 'Argentina', '3', null]]
 }
 */
 ```
-
-<!--lang:es-->
-> **Nota:** este documento describe el diseño propuesto para columnas esparsas; todavía no está implementado en
-> el código de `tab-plus`. Los ejemplos de `parseTab`/`generateTab` de arriba muestran la forma esperada de la
-> API, no una API ya disponible.
-<!--lang:en--]
-> **Note:** this document describes the proposed design for sparse columns; it is not yet implemented in
-> `tab-plus`'s code. The `parseTab`/`generateTab` examples above show the expected shape of the API, not an
-> already available one.
-[!--lang:*-->
