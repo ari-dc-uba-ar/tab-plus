@@ -7,8 +7,12 @@
   "repository": "ari-dc-uba-ar/tab-plus",
   "main": "dist/tab-plus.js",
   "types": "dist/tab-plus.d.ts",
+  "bin": {
+    "tab-plus": "bin/tab-plus.js"
+  },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "contributors": [
     {
