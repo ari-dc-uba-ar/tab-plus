@@ -164,10 +164,12 @@ uses [sparse columns](tab-plus.md) for the columns that are almost always `\N` (
 tab-plus sparse FILE.tab [options]
 ```
 
-For each column it computes what percentage of rows differ from `null` and what percentage differ from
-`'false'`. If either is under the threshold, the column becomes sparse against that default (null is tried
-first); otherwise the column stays a regular column. The output file is the original name with a `-sparse`
-suffix before the extension (e.g. `countries.tab` → `countries-sparse.tab`), unless `--output` is given.
+For each column it tries 7 candidate default values: two adjacent separators (the implicitly-empty field, per
+the `emptyField` option), `\E` (explicit empty string), `\N` (explicit `null`), `'1'`, `'0'`, `'true'` and
+`'false'`. It keeps whichever candidate leaves the fewest rows differing; if that count is under the threshold,
+the column becomes sparse against that default; otherwise the column stays a regular column. The output file
+is the original name with a `-sparse` suffix before the extension (e.g. `countries.tab` →
+`countries-sparse.tab`), unless `--output` is given.
 
 Options:
 
@@ -178,7 +180,7 @@ Options:
   computation. Columns named in neither `--fixed` nor `--sparse` are **not** recomputed against `--under`: they
   stay exactly as they were in the original file (sparse or not, with the same default if they already were).
 * `--sparse col1,col2,...`: forces those (comma-separated) columns to become sparse regardless of the
-  computation (the default is whichever of `null`/`'false'` produces fewer differing rows). Unlisted columns
+  threshold (picking, among the 7 candidates, whichever leaves the fewest rows differing). Unlisted columns
   behave the same as with `--fixed`: they stay as they were in the original.
 * `--output file.tab`: output filename.
 

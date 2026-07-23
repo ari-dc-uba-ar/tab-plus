@@ -19,13 +19,33 @@ describe('sparse columns: header parsing', function(){
         expect(tab.fields).to.eql(['c2', 'c3', 'num', 'en_name', 'sp_name', 'estrellas', 'mediterraneo']);
         expect(tab.columnDefs).to.eql({
             c2: {position: 1}, c3: {position: 2}, num: {position: 3}, en_name: {position: 4}, sp_name: {position: 5},
-            estrellas: {position: 1, sparseDefault: null},
+            estrellas: {position: 1, sparseDefault: ''},
             mediterraneo: {position: 2, sparseDefault: 'false'}
         });
     });
-    it('a sparse column without a ":default" suffix defaults to null', function(){
-        const tab = tabPlus.parseTab('a|\\: b\r\n1|\r\n');
+    // a sparse column's ':default' suffix has the exact same three-way ambiguity as any regular field
+    // (compare to the 'emptyField option' describe block above): ':\E' forces '', ':\N' forces null, and no
+    // suffix at all means "whatever an implicitly-empty field means", i.e. emptyFieldValue(options)
+    it('"column:\\E" declares an explicit empty-string default', function(){
+        const tab = tabPlus.parseTab('a|\\: b:\\E\r\n1|\r\n');
+        expect(tab.columnDefs!.b).to.eql({position: 1, sparseDefault: ''});
+    });
+    it('"column:\\N" declares an explicit null default', function(){
+        const tab = tabPlus.parseTab('a|\\: b:\\N\r\n1|\r\n');
         expect(tab.columnDefs!.b).to.eql({position: 1, sparseDefault: null});
+    });
+    it('a bare "column" (no suffix at all) defaults like an implicitly-empty field: \'\' by default', function(){
+        const tab = tabPlus.parseTab('a|\\: b\r\n1|\r\n');
+        expect(tab.columnDefs!.b).to.eql({position: 1, sparseDefault: ''});
+    });
+    it('a bare "column" defaults to null with emptyField: "null"', function(){
+        const tab = tabPlus.parseTab('a|\\: b\r\n1|\r\n', {emptyField: 'null'});
+        expect(tab.columnDefs!.b).to.eql({position: 1, sparseDefault: null});
+    });
+    it('a bare "column" defaults to the configured symbol with emptyField: a symbol', function(){
+        const missing = Symbol('missing');
+        const tab = tabPlus.parseTab('a|\\: b\r\n1|\r\n', {emptyField: missing});
+        expect(tab.columnDefs!.b).to.eql({position: 1, sparseDefault: missing});
     });
 });
 
@@ -33,8 +53,8 @@ describe('sparse columns: parsing rows', function(){
     it('rows are plain arrays, common columns then sparse columns, defaulting when absent from the block', function(){
         const tab = tabPlus.parseTab(countriesContent);
         expect(tab.rows).to.eql([
-            ['AF', 'AFG', '004', 'Afghanistan', 'Afganistán', null, 'false'],
-            ['AD', 'AND', '020', 'Andorra', 'Andorra', null, 'true'],
+            ['AF', 'AFG', '004', 'Afghanistan', 'Afganistán', '', 'false'],
+            ['AD', 'AND', '020', 'Andorra', 'Andorra', '', 'true'],
             ['AR', 'ARG', '032', 'Argentina', 'Argentina', '3', 'false']
         ]);
     });
@@ -143,21 +163,31 @@ describe('sparse columns: generating', function(){
             rows: [['1', 'y'], ['2', null]]
         };
         const text = tabPlus.generateTab(tab, {eol: '\r\n'});
-        expect(text).to.eql('a|\\: b\r\n1|b:y\r\n2|\r\n');
+        expect(text).to.eql('a|\\: b:\\N\r\n1|b:y\r\n2|\r\n');
         expect(tabPlus.parseTab(text)).to.eql({
             fields: ['a', 'b'],
             columnDefs: {a: {position: 1}, b: {position: 1, sparseDefault: null}},
             rows: [['1', 'y'], ['2', null]]
         });
     });
-    it('escapes a literal space in a sparse value as \\s, and round-trips it back through parseTab', function(){
+    it('a null sparseDefault is written with an explicit ":\\N" suffix (it is not what an implicitly-empty field means, by default)', function(){
         const tab: tabPlus.Tab = {
             fields: ['id', 'status'],
             columnDefs: {id: {position: 1}, status: {position: 1, sparseDefault: null}},
-            rows: [['1', 'on hold']]
+            rows: [['1', 'on hold'], ['2', null]]
         };
         const text = tabPlus.generateTab(tab, {eol: '\r\n'});
-        expect(text).to.eql('id|\\: status\r\n1|status:on\\shold\r\n');
+        expect(text).to.eql('id|\\: status:\\N\r\n1|status:on\\shold\r\n2|\r\n');
+        expect(tabPlus.parseTab(text)).to.eql(tab);
+    });
+    it('an empty-string sparseDefault is written bare (no suffix), matching what an implicitly-empty field means by default', function(){
+        const tab: tabPlus.Tab = {
+            fields: ['id', 'status'],
+            columnDefs: {id: {position: 1}, status: {position: 1, sparseDefault: ''}},
+            rows: [['1', 'on hold'], ['2', '']]
+        };
+        const text = tabPlus.generateTab(tab, {eol: '\r\n'});
+        expect(text).to.eql('id|\\: status\r\n1|status:on\\shold\r\n2|\r\n');
         expect(tabPlus.parseTab(text)).to.eql(tab);
     });
     it('escapes a literal space in a sparse column\'s declared default, and round-trips it back through parseTab', function(){

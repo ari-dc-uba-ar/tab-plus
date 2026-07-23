@@ -116,7 +116,9 @@ describe('cli sparse', function(){
         runSparse(args({filename: file, sparse: ['c2']}));
         const tab = tabPlus.parseTab(readOutput('already-sparse-sparse.tab'));
         expect(tab.columnDefs!.mediterraneo.sparseDefault).to.eql('false');
-        expect(tab.columnDefs!.c2.sparseDefault).to.eql(null);
+        // every c2 value is distinct, so every one of the 7 candidate defaults leaves 100% of rows differing;
+        // ties keep the earliest candidate, which is '' (the "adjacent separators" / emptyFieldValue() one)
+        expect(tab.columnDefs!.c2.sparseDefault).to.eql('');
     });
 
     it('escapes a literal space in a sparse value as \\s', function(){

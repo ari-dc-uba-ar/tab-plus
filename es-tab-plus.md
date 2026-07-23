@@ -54,8 +54,14 @@ the header appear, within a single final column of the file.
 <!--lang:es-->
 En el encabezado, el nombre de la última columna empieza con `\:`. Después de `\:` van los nombres de las
 columnas esparsas, separados por un espacio físico (usar `\s` para un espacio literal dentro de un nombre). Cada
-nombre puede llevar el sufijo `:valor`, que declara el valor por defecto de esa columna; si no lleva sufijo, el
-valor por defecto es `\N` (`null`).
+nombre puede llevar el sufijo `:valor`, que declara el valor por defecto de esa columna. Ese sufijo tiene la
+misma ambigüedad que cualquier campo común, y se resuelve de la misma forma:
+
+* `columna:\E` — el valor por defecto es explícitamente la cadena vacía `''`.
+* `columna:\N` — el valor por defecto es explícitamente `null`.
+* `columna` (sin sufijo) — el valor por defecto es el que le corresponda a un campo sin contenido (dos
+  separadores pegados), según la opción `emptyField`: `''` por defecto, `null` con `emptyField: 'null'`, o el
+  symbol configurado con `emptyField: symbol`.
 
 En cada fila de datos, la última columna contiene los pares `columna:valor` (los dos puntos son siempre
 obligatorios) de las columnas esparsas cuyo valor, en esa fila, difiere del valor por defecto declarado en el
@@ -69,7 +75,14 @@ ejemplo), y `fields` incluye también los nombres de las columnas esparsas. Lo e
 <!--lang:en--]
 In the header, the name of the last column starts with `\:`. After `\:` come the names of the sparse columns,
 separated by a physical space (use `\s` for a literal space inside a name). Each name may carry a `:value`
-suffix, which declares that column's default value; if there is no suffix, the default value is `\N` (`null`).
+suffix, which declares that column's default value. That suffix has the same ambiguity as any regular field,
+and is resolved the same way:
+
+* `column:\E` — the default value is explicitly the empty string `''`.
+* `column:\N` — the default value is explicitly `null`.
+* `column` (no suffix) — the default value is whatever a field with no content at all (two adjacent
+  separators) would be, per the `emptyField` option: `''` by default, `null` with `emptyField: 'null'`, or the
+  configured symbol with `emptyField: symbol`.
 
 In each data row, the last column holds the `column:value` pairs (the colon is always mandatory) for the sparse
 columns whose value, on that row, differs from the default declared in the header. Pairs are also separated by
@@ -192,7 +205,8 @@ del bloque esparso al generar.
 
 * una columna común (no esparsa) tiene como valor `{position: number}`.
 * una columna esparsa tiene como valor `{position: number, sparseDefault: valor}`, con el valor por defecto
-  declarado en el encabezado para esa columna (`null` si no llevaba sufijo `:valor`).
+  declarado en el encabezado para esa columna (ver la sección de sintaxis para cómo se resuelve sin sufijo
+  `:valor`).
 
 `generateTab` acepta `columnDefs` de la misma forma (junto con `rows`), de forma igualmente opcional: sin
 `columnDefs`, genera un `.tab` común, sin ninguna columna esparsa (retrocompatible con el formato de antes de
@@ -218,7 +232,8 @@ sparse block when generating.
 
 * a regular (non-sparse) column has `{position: number}` as its value.
 * a sparse column has `{position: number, sparseDefault: value}` as its value, with the default value
-  declared in the header for that column (`null` if it had no `:value` suffix).
+  declared in the header for that column (see the syntax section above for how it's resolved without a
+  `:value` suffix).
 
 `generateTab` accepts `columnDefs` the same way (alongside `rows`), just as optionally: without `columnDefs`,
 it generates a plain `.tab`, with no sparse columns at all (backwards compatible with the format before this
@@ -237,7 +252,7 @@ tabPlus.parseTab(
   fields: ['c2', 'c3', 'num', 'en_name', 'sp_name', 'estrellas', 'mediterraneo'],
   columnDefs: {
     c2: {position: 1}, c3: {position: 2}, num: {position: 3}, en_name: {position: 4}, sp_name: {position: 5},
-    estrellas: {position: 1, sparseDefault: null},
+    estrellas: {position: 1, sparseDefault: ''},
     mediterraneo: {position: 2, sparseDefault: 'false'}
   },
   rows: [['AR', 'ARG', '032', 'Argentina', 'Argentina', '3', null]]

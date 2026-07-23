@@ -89,7 +89,7 @@ function toHex(char: string): string {
 // 'string' (default, backwards compatible) means it is an empty string; 'null' means it is `null`; passing a
 // symbol means it is that symbol (handy as a sentinel distinct from any real string or `null` value).
 // Regardless of this option, `\E` always means an explicit empty string and `\N` always means an explicit `null`.
-function emptyFieldValue(options?: Options): FieldValue {
+export function emptyFieldValue(options?: Options): FieldValue {
     const emptyField = options && options.emptyField;
     if(emptyField === 'null'){
         return null;
@@ -324,10 +324,15 @@ function isSkippableLine(line: string): boolean {
 
 // parses a header line's raw (still '|' split, not yet unescaped) fields into {fields, columnDefs}. The last
 // raw field starts the sparse-columns section when it begins with the literal `\:` marker; each subsequent
-// space-separated entry is a sparse column's `name` (default `\N`/null) or `name:default`. Without that
+// space-separated entry is a sparse column's `name` (no suffix at all) or `name:default`. Without that
 // marker, there are no sparse columns. `fields` lists common columns first, then sparse ones (see the
 // `columnDefs` doc section); options.unknownColumn, when given, is appended as one more sparse column
 // (default null) if the header didn't already declare it.
+//
+// a bare `name` (no `:` at all) has the exact same ambiguity as two adjacent field separators (e.g. `a||b`):
+// unescapeField('', options) resolves it the same way in both places, so it means `''`/`null`/the configured
+// symbol depending on options.emptyField, exactly like an implicitly-empty regular field. `name:\E` and
+// `name:\N` still force an explicit `''` or `null` regardless of options.emptyField, same as any other field.
 function parseHeaderFields(rawFields: string[], options?: Options): {fields: FieldValue[]; columnDefs: ColumnDefs} {
     const lastRaw = rawFields[rawFields.length - 1];
     const hasSparseSection = rawFields.length > 0 && lastRaw !== undefined && sparseHeaderMarker.test(lastRaw);
@@ -343,7 +348,7 @@ function parseHeaderFields(rawFields: string[], options?: Options): {fields: Fie
     const sparseFields = sparseEntries.filter(function(rawEntry){ return rawEntry !== ''; }).map(function(rawEntry, i){
         const split = splitSparsePair(rawEntry);
         const field = String(unescapeField(split ? split.rawName : rawEntry));
-        columnDefs[field] = {position: i + 1, sparseDefault: split ? unescapeField(split.rawValue, options) : null};
+        columnDefs[field] = {position: i + 1, sparseDefault: unescapeField(split ? split.rawValue : '', options)};
         return field;
     });
     if(options && options.unknownColumn && !Object.prototype.hasOwnProperty.call(columnDefs, options.unknownColumn)){
@@ -356,6 +361,11 @@ function parseHeaderFields(rawFields: string[], options?: Options): {fields: Fie
 // generates a header line from {fields, columnDefs}: common columns '|' separated as usual, followed (only
 // when columnDefs declares at least one sparse column) by the `\:` marker and the space-separated
 // `name`/`name:default` entries, in columnDefs position order - the inverse of parseHeaderFields
+//
+// a sparseDefault is left as a bare `name` (no suffix) exactly when escapeField would otherwise generate it
+// implicitly (i.e. it equals options.emptyField's value - '' by default), matching parseHeaderFields reading
+// a bare `name` back the same way; any other default (including `null` when emptyField isn't 'null', or `''`
+// when it's not the default 'string' mode) gets its explicit `:\N`/`:\E`/literal suffix from escapeField
 function generateHeaderFields(fields: FieldValue[], columnDefs: ColumnDefs, options?: Options): string {
     const {common, sparse} = orderedFieldsOf(columnDefs);
     const commonRaw = fields.slice(0, common.length).map(function(field){
@@ -366,8 +376,8 @@ function generateHeaderFields(fields: FieldValue[], columnDefs: ColumnDefs, opti
     }
     const sparseRaw = sparse.map(function(field){
         const rawName = escapeField(field).replace(/ /g, '\\s');
-        const sparseDefault = columnDefs[field].sparseDefault!;
-        return sparseDefault === null ? rawName : rawName + ':' + escapeField(sparseDefault, options).replace(/ /g, '\\s');
+        const rawDefault = escapeField(columnDefs[field].sparseDefault!, options).replace(/ /g, '\\s');
+        return rawDefault === '' ? rawName : rawName + ':' + rawDefault;
     });
     return commonRaw.concat(['\\: ' + sparseRaw.join(' ')]).join('|');
 }

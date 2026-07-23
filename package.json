@@ -49,9 +49,9 @@
   "scripts": {
     "build": "tsc -p src",
     "pretest": "npm run build",
-    "test": "mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts test/cli.ts",
+    "test": "mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts test/auto-tab-plus.ts test/cli.ts",
     "pretest-ci": "npm run build",
-    "test-ci": "nyc mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts test/cli.ts",
+    "test-ci": "nyc mocha --reporter spec --bail --check-leaks -r tsx/cjs --extensions ts test/test.ts test/sparse.ts test/auto-tab-plus.ts test/cli.ts",
     "docs": "multilang --check --verbose LEEME.md && multilang LEEME.md"
   },
   "qa-control": {

@@ -86,8 +86,9 @@ const sparseCommand = command({
         }
     },
     help: {
-        description: 'Computes which columns have less than a threshold of values that differ from null (or ' +
-            'from "false"), and rewrites the file with those columns encoded as sparse columns.',
+        description: 'For each column, checks 7 candidate default values (adjacent separators, \\E, \\N, "1", ' +
+            '"0", "true", "false") and picks whichever leaves the fewest rows differing; if that\'s under the ' +
+            'threshold, the column is rewritten as a sparse column against that default.',
         examples: ['tab-plus sparse countries.tab', 'tab-plus sparse countries.tab --under 15%',
             'tab-plus sparse countries.tab --fixed mediterraneo --output countries2.tab']
     }

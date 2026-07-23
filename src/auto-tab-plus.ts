@@ -1,4 +1,4 @@
-import {FieldValue, ColumnDefs} from './tab-plus';
+import {FieldValue, ColumnDefs, Options, emptyFieldValue} from './tab-plus';
 
 export interface Threshold {
     kind: 'relative' | 'absolute';
@@ -35,21 +35,39 @@ function qualifies(diffCount: number, total: number, threshold: Threshold): bool
     return diffCount < threshold.value;
 }
 
-function columnStat(rows: FieldValue[][], colIndex: number): {diffFromNull: number; diffFromFalse: number} {
-    let diffFromNull = 0;
-    let diffFromFalse = 0;
-    rows.forEach(function(row){
-        const value = row[colIndex];
-        if(value !== null){ diffFromNull++; }
-        if(value !== 'false'){ diffFromFalse++; }
+// candidate default values considered when picking a sparse column's default: the same three-way ambiguity
+// any regular field has (adjacent separators / explicit '\E' / explicit '\N' - see the `emptyField` option
+// and its "seven" callout in the CLI docs), plus four common literal encodings of an "off"/default state
+function candidateDefaults(options?: Options): FieldValue[] {
+    const candidates = [emptyFieldValue(options), '', null, '1', '0', 'true', 'false'];
+    return candidates.filter(function(candidate, i){
+        return candidates.indexOf(candidate) === i;
     });
-    return {diffFromNull, diffFromFalse};
+}
+
+// the candidate default (see candidateDefaults) that leaves the fewest rows differing from it, and how many
+// that is; ties keep the earlier candidate in the list above
+function bestDefault(rows: FieldValue[][], colIndex: number, options?: Options): {value: FieldValue; diffCount: number} {
+    let best: {value: FieldValue; diffCount: number} | null = null;
+    candidateDefaults(options).forEach(function(candidate){
+        let diffCount = 0;
+        rows.forEach(function(row){
+            if(row[colIndex] !== candidate){ diffCount++; }
+        });
+        if(best === null || diffCount < best.diffCount){
+            best = {value: candidate, diffCount};
+        }
+    });
+    return best!;
 }
 
 export interface AutoSparseOptions {
     under: Threshold;
     fixed?: string[];
     sparse?: string[];
+    // forwarded to emptyFieldValue() when weighing the "adjacent separators" candidate default - matches the
+    // emptyField option that will eventually be passed through to parseTab/generateTab themselves
+    emptyField?: Options['emptyField'];
 }
 
 export interface DecidedColumns {
@@ -59,13 +77,13 @@ export interface DecidedColumns {
     columnDefs: ColumnDefs;
 }
 
-// decides, per column, whether it becomes sparse and, if so, against which default (null or 'false'):
+// decides, per column, whether it becomes sparse and, if so, against which default:
 //
 // - a column named in `options.fixed` stays regular, regardless of its stats.
-// - a column named in `options.sparse` becomes sparse, regardless of its stats (default: whichever of
-//   null/'false' produces fewer differing rows).
+// - a column named in `options.sparse` becomes sparse, regardless of its stats, against whichever candidate
+//   default (see candidateDefaults) leaves the fewest rows differing.
 // - when neither `options.fixed` nor `options.sparse` is given, every column is decided by the `options.under`
-//   threshold: sparse against null if that qualifies, else sparse against 'false' if that qualifies, else regular.
+//   threshold, checked against that same best candidate default.
 // - when either is given, every OTHER column (not named in either list) keeps its original sparse/regular
 //   status from `existingColumnDefs` (as returned by `parseTab`) instead of being recomputed - i.e. `--fixed`/
 //   `--sparse` are manual overrides on top of whatever the input file already was, not a re-run of the
@@ -87,21 +105,17 @@ export function decideSparseColumns(
         if(options.fixed && options.fixed.indexOf(name) !== -1){
             sparse = false;
         }else if(options.sparse && options.sparse.indexOf(name) !== -1){
-            const stat = columnStat(rows, colIndex);
             sparse = true;
-            defaultValue = stat.diffFromNull <= stat.diffFromFalse ? null : 'false';
+            defaultValue = bestDefault(rows, colIndex, {emptyField: options.emptyField}).value;
         }else if(manualOverride){
             const original = existingColumnDefs && existingColumnDefs[name];
             sparse = !!original && original.sparseDefault !== undefined;
             defaultValue = sparse ? original!.sparseDefault! : null;
         }else{
-            const stat = columnStat(rows, colIndex);
-            if(qualifies(stat.diffFromNull, total, options.under)){
+            const best = bestDefault(rows, colIndex, {emptyField: options.emptyField});
+            if(qualifies(best.diffCount, total, options.under)){
                 sparse = true;
-                defaultValue = null;
-            }else if(qualifies(stat.diffFromFalse, total, options.under)){
-                sparse = true;
-                defaultValue = 'false';
+                defaultValue = best.value;
             }else{
                 sparse = false;
             }

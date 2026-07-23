@@ -272,11 +272,12 @@ usa [columnas esparsas](es-tab-plus.md) para las columnas que casi siempre valen
 tab-plus sparse ARCHIVO.tab [opciones]
 ```
 
-Por cada columna calcula qué porcentaje de filas difiere de `null` y qué porcentaje difiere de `'false'`. Si
-alguno de los dos está por debajo del umbral, la columna se vuelve esparsa contra ese valor por defecto (se
-prueba primero contra `null`); si no, la columna queda como una columna común. El archivo de salida es el
-original con el sufijo `-sparse` antes de la extensión (por ejemplo `paises.tab` → `paises-sparse.tab`), salvo
-que se indique `--output`.
+Por cada columna prueba 7 valores candidatos como posible valor por defecto: dos separadores pegados (el campo
+implícitamente vacío, según la opción `emptyField`), `\E` (cadena vacía explícita), `\N` (`null` explícito),
+`'1'`, `'0'`, `'true'` y `'false'`. Se queda con el candidato que deja menos filas distintas; si esa cantidad
+está por debajo del umbral, la columna se vuelve esparsa contra ese valor por defecto; si no, la columna queda
+como una columna común. El archivo de salida es el original con el sufijo `-sparse` antes de la extensión (por
+ejemplo `paises.tab` → `paises-sparse.tab`), salvo que se indique `--output`.
 
 Opciones:
 
@@ -288,8 +289,8 @@ Opciones:
   `--under`: quedan tal cual estaban en el archivo original (esparsas o no, con el mismo valor por defecto si ya
   lo eran).
 * `--sparse col1,col2,...`: fuerza a que esas columnas (separadas por coma) se vuelvan esparsas sin importar el
-  cálculo (se elige como valor por defecto el que menos filas distintas produzca entre `null` y `'false'`). Las
-  columnas no listadas se comportan igual que con `--fixed`: quedan como estaban en el original.
+  umbral (se elige, entre los 7 candidatos, el que deje menos filas distintas). Las columnas no listadas se
+  comportan igual que con `--fixed`: quedan como estaban en el original.
 * `--output archivo.tab`: nombre del archivo de salida.
 
 Sin `--fixed` ni `--sparse`, todas las columnas se deciden con `--under` (por defecto 10%).
@@ -307,10 +308,12 @@ uses [sparse columns](tab-plus.md) for the columns that are almost always `\N` (
 tab-plus sparse FILE.tab [options]
 ```
 
-For each column it computes what percentage of rows differ from `null` and what percentage differ from
-`'false'`. If either is under the threshold, the column becomes sparse against that default (null is tried
-first); otherwise the column stays a regular column. The output file is the original name with a `-sparse`
-suffix before the extension (e.g. `countries.tab` → `countries-sparse.tab`), unless `--output` is given.
+For each column it tries 7 candidate default values: two adjacent separators (the implicitly-empty field, per
+the `emptyField` option), `\E` (explicit empty string), `\N` (explicit `null`), `'1'`, `'0'`, `'true'` and
+`'false'`. It keeps whichever candidate leaves the fewest rows differing; if that count is under the threshold,
+the column becomes sparse against that default; otherwise the column stays a regular column. The output file
+is the original name with a `-sparse` suffix before the extension (e.g. `countries.tab` →
+`countries-sparse.tab`), unless `--output` is given.
 
 Options:
 
@@ -321,7 +324,7 @@ Options:
   computation. Columns named in neither `--fixed` nor `--sparse` are **not** recomputed against `--under`: they
   stay exactly as they were in the original file (sparse or not, with the same default if they already were).
 * `--sparse col1,col2,...`: forces those (comma-separated) columns to become sparse regardless of the
-  computation (the default is whichever of `null`/`'false'` produces fewer differing rows). Unlisted columns
+  threshold (picking, among the 7 candidates, whichever leaves the fewest rows differing). Unlisted columns
   behave the same as with `--fixed`: they stay as they were in the original.
 * `--output file.tab`: output filename.
 
