@@ -3,6 +3,7 @@
         "target": "ES2019",
         "lib": ["ES2019"],
         "module": "umd",
+        "moduleResolution": "node10",
         "declaration": true,
         "outDir": "../dist",
         "strict": true,

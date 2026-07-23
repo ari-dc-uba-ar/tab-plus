@@ -154,6 +154,41 @@ npm install tab-plus
 The library is written in TypeScript and ships its own type declarations (`dist/tab-plus.d.ts`); no `@types`
 package is needed.
 
+## CLI: `tab-plus sparse`
+
+The package installs a `tab-plus` command with a `sparse` subcommand that converts a `.tab` file into one that
+uses [sparse columns](tab-plus.md) for the columns that are almost always `\N` (`null`) or `false`, using
+`parseTab`/`generateTab` (and their `columnDefs` support) to read and write the file.
+
+```
+tab-plus sparse FILE.tab [options]
+```
+
+For each column it tries 7 candidate default values: two adjacent separators (the implicitly-empty field, per
+the `emptyField` option), `\E` (explicit empty string), `\N` (explicit `null`), `'1'`, `'0'`, `'true'` and
+`'false'`. It keeps whichever candidate leaves the fewest rows differing; if that count is under the threshold,
+the column becomes sparse against that default; otherwise the column stays a regular column. The output file
+is the original name with a `-sparse` suffix before the extension (e.g. `countries.tab` →
+`countries-sparse.tab`), unless `--output` is given.
+
+Options:
+
+* `--under 10%` (default): a column qualifies when fewer than 10% of rows differ from the default — relative
+  threshold.
+* `--under 10`: absolute variant — the column qualifies when fewer than 10 rows differ from the default.
+* `--fixed col1,col2,...`: forces those (comma-separated) columns to stay fixed (non-sparse) regardless of the
+  computation. Columns named in neither `--fixed` nor `--sparse` are **not** recomputed against `--under`: they
+  stay exactly as they were in the original file (sparse or not, with the same default if they already were).
+* `--sparse col1,col2,...`: forces those (comma-separated) columns to become sparse regardless of the
+  threshold (picking, among the 7 candidates, whichever leaves the fewest rows differing). Unlisted columns
+  behave the same as with `--fixed`: they stay as they were in the original.
+* `--output file.tab`: output filename.
+
+Without `--fixed` or `--sparse`, every column is decided by `--under` (10% by default).
+
+> The file this command generates can be read back with `tabPlus.parseTab` (`columnDefs` included), and running
+> it through `tab-plus sparse` again lets you adjust specific columns' sparseness without touching the rest.
+
 ## API
 
 ```js

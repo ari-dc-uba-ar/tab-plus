@@ -261,6 +261,79 @@ The library is written in TypeScript and ships its own type declarations (`dist/
 package is needed.
 [!--lang:*-->
 
+<!--lang:es-->
+## CLI: `tab-plus sparse`
+
+El paquete instala un comando `tab-plus` con un subcomando `sparse` que convierte un archivo `.tab` en uno que
+usa [columnas esparsas](es-tab-plus.md) para las columnas que casi siempre valen `\N` (`null`) o `false`, usando
+`parseTab`/`generateTab` (y su soporte para `columnDefs`) para leer y escribir el archivo.
+
+```
+tab-plus sparse ARCHIVO.tab [opciones]
+```
+
+Por cada columna prueba 7 valores candidatos como posible valor por defecto: dos separadores pegados (el campo
+implícitamente vacío, según la opción `emptyField`), `\E` (cadena vacía explícita), `\N` (`null` explícito),
+`'1'`, `'0'`, `'true'` y `'false'`. Se queda con el candidato que deja menos filas distintas; si esa cantidad
+está por debajo del umbral, la columna se vuelve esparsa contra ese valor por defecto; si no, la columna queda
+como una columna común. El archivo de salida es el original con el sufijo `-sparse` antes de la extensión (por
+ejemplo `paises.tab` → `paises-sparse.tab`), salvo que se indique `--output`.
+
+Opciones:
+
+* `--under 10%` (por defecto): una columna califica cuando menos del 10% de las filas difieren del valor por
+  defecto — umbral relativo.
+* `--under 10`: variante absoluta — la columna califica cuando menos de 10 filas difieren del valor por defecto.
+* `--fixed col1,col2,...`: fuerza a que esas columnas (separadas por coma) queden fijas (no esparsas) sin
+  importar el cálculo. Las columnas no listadas ni en `--fixed` ni en `--sparse` **no** se recalculan con
+  `--under`: quedan tal cual estaban en el archivo original (esparsas o no, con el mismo valor por defecto si ya
+  lo eran).
+* `--sparse col1,col2,...`: fuerza a que esas columnas (separadas por coma) se vuelvan esparsas sin importar el
+  umbral (se elige, entre los 7 candidatos, el que deje menos filas distintas). Las columnas no listadas se
+  comportan igual que con `--fixed`: quedan como estaban en el original.
+* `--output archivo.tab`: nombre del archivo de salida.
+
+Sin `--fixed` ni `--sparse`, todas las columnas se deciden con `--under` (por defecto 10%).
+
+> El archivo que genera este comando se puede volver a leer con `tabPlus.parseTab` (incluido `columnDefs`), y
+> volver a pasar por `tab-plus sparse` sirve para ajustar la sparseness de columnas puntuales sin tocar el resto.
+<!--lang:en--]
+## CLI: `tab-plus sparse`
+
+The package installs a `tab-plus` command with a `sparse` subcommand that converts a `.tab` file into one that
+uses [sparse columns](tab-plus.md) for the columns that are almost always `\N` (`null`) or `false`, using
+`parseTab`/`generateTab` (and their `columnDefs` support) to read and write the file.
+
+```
+tab-plus sparse FILE.tab [options]
+```
+
+For each column it tries 7 candidate default values: two adjacent separators (the implicitly-empty field, per
+the `emptyField` option), `\E` (explicit empty string), `\N` (explicit `null`), `'1'`, `'0'`, `'true'` and
+`'false'`. It keeps whichever candidate leaves the fewest rows differing; if that count is under the threshold,
+the column becomes sparse against that default; otherwise the column stays a regular column. The output file
+is the original name with a `-sparse` suffix before the extension (e.g. `countries.tab` →
+`countries-sparse.tab`), unless `--output` is given.
+
+Options:
+
+* `--under 10%` (default): a column qualifies when fewer than 10% of rows differ from the default — relative
+  threshold.
+* `--under 10`: absolute variant — the column qualifies when fewer than 10 rows differ from the default.
+* `--fixed col1,col2,...`: forces those (comma-separated) columns to stay fixed (non-sparse) regardless of the
+  computation. Columns named in neither `--fixed` nor `--sparse` are **not** recomputed against `--under`: they
+  stay exactly as they were in the original file (sparse or not, with the same default if they already were).
+* `--sparse col1,col2,...`: forces those (comma-separated) columns to become sparse regardless of the
+  threshold (picking, among the 7 candidates, whichever leaves the fewest rows differing). Unlisted columns
+  behave the same as with `--fixed`: they stay as they were in the original.
+* `--output file.tab`: output filename.
+
+Without `--fixed` or `--sparse`, every column is decided by `--under` (10% by default).
+
+> The file this command generates can be read back with `tabPlus.parseTab` (`columnDefs` included), and running
+> it through `tab-plus sparse` again lets you adjust specific columns' sparseness without touching the rest.
+[!--lang:*-->
+
 ## API
 
 ```js
