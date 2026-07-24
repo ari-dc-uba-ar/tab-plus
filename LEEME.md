@@ -351,11 +351,22 @@ Parsea el contenido completo de un archivo `.tab`. Devuelve `{fields, rows}` don
 nombres de columna y `rows` es un array de arrays de valores de campo (strings, además de `null` o el symbol
 configurado donde corresponda — ver `emptyField` más arriba), o un array de objetos si se pasa
 `{objectRows: true}` (ver `objectRows` más arriba). `options` es opcional.
+
+Si (luego de quitar un posible BOM inicial) el primer carácter del archivo es `-` o `[`, todo el contenido se
+interpreta en cambio como un único documento YAML — un arreglo de mappings `columna: valor`, una fila por ítem
+— pensado para tablas de pocas filas y valores verbosos donde YAML es más legible para editar a mano que
+`.tab`. Ver [Leer un archivo `.tab` completo como YAML](es-tab-plus.md#leer-un-archivo-tab-completo-como-yaml)
+para los detalles.
 <!--lang:en--]
 Parses the full content of a `.tab` file. Returns `{fields, rows}` where `fields` is an array of column names
 and `rows` is an array of arrays of field values (strings, plus `null` or the configured symbol where
 applicable — see `emptyField` above), or an array of objects if `{objectRows: true}` is passed (see
 `objectRows` above). `options` is optional.
+
+If (once a leading BOM is stripped) the file's first character is `-` or `[`, the whole content is instead
+parsed as a single YAML document — an array of `column: value` mappings, one row per item — meant for tables
+with few rows and verbose values where YAML is more readable to hand-edit than `.tab`. See
+[Reading a whole `.tab` file as YAML](tab-plus.md#reading-a-whole-tab-file-as-yaml) for the details.
 [!--lang:*-->
 
 ```js
