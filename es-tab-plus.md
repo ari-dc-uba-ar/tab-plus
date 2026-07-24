@@ -259,3 +259,58 @@ tabPlus.parseTab(
 }
 */
 ```
+
+<!--lang:es-->
+## Leer un archivo `.tab` completo como YAML
+<!--lang:en--]
+## Reading a whole `.tab` file as YAML
+[!--lang:*-->
+
+<!--lang:es-->
+Una fila `.tab` común nunca empieza con `-` ni con `[` — esos serían el primer carácter del nombre de la
+primera columna, un caso raro pero no ambiguo en la práctica. `parseTab` aprovecha eso: si, luego de quitar un
+posible BOM inicial, el primer carácter del archivo es `-` o `[`, todo el contenido se interpreta como un único
+documento YAML en vez de como líneas separadas por `|`, sin necesidad de ninguna opción adicional.
+
+Esto sirve para tablas con pocas filas y valores muy verbosos, donde YAML es más legible para editar a mano que
+`.tab` — por ejemplo las tablas `parameters` o `rules` de una aplicación `backend-plus`, que suelen tener uno o
+pocos registros con textos largos.
+
+El YAML esperado es un arreglo donde cada ítem es un mapping (`columna: valor`), una fila por ítem — por eso
+siempre empieza con `-` (secuencia en bloque) o con `[` (secuencia de flujo). `fields` se arma con todas las
+claves vistas en cualquier fila, en el orden en que aparecen por primera vez; una fila a la que le falta una
+clave que otra sí tiene recibe `emptyFieldValue(options)` en esa columna (el mismo significado de "acá no se
+escribió nada" que un campo `.tab` implícitamente vacío — ver la opción `emptyField` en el README). Un valor
+`null` se conserva como `null` y un string se conserva tal cual; cualquier otro escalar (número, booleano) se
+convierte a string, porque todo campo `.tab` es un string o `null`.
+
+Este modo no tiene columnas esparsas: como YAML ya permite que cada fila lleve solo las claves que necesita, el
+resultado es siempre un `Tab` plano (sin `columnDefs`), igual que un `.tab` sin ninguna columna esparsa
+declarada. Y aplica solo a la lectura (`parseTab`) — no hay una forma equivalente de generar YAML con
+`generateTab`.
+<!--lang:en--]
+A regular `.tab` row never starts with `-` or `[` — those would be the first character of the first column's
+name, a rare but not truly ambiguous case in practice. `parseTab` takes advantage of that: once a leading BOM
+is stripped, if the file's first character is `-` or `[`, the whole content is parsed as a single YAML document
+instead of `|`-separated lines, with no extra option needed.
+
+This is meant for tables with few rows and very verbose values, where YAML is more readable to hand-edit than
+`.tab` — for example a `backend-plus` application's `parameters` or `rules` tables, which usually have one or a
+few records with long text.
+
+The expected YAML is an array where each item is a mapping (`column: value`), one row per item — that's why it
+always starts with `-` (block sequence) or `[` (flow sequence). `fields` is built from every key seen on any
+row, in first-appearance order; a row missing a key some other row has gets `emptyFieldValue(options)` for that
+column (the same "nothing was written here" meaning an implicitly-empty `.tab` field has — see the `emptyField`
+option in the README). A `null` value stays `null` and a string stays as-is; any other scalar (number, boolean)
+is stringified, since every `.tab` field is a string or `null`.
+
+This mode has no sparse columns: since YAML already lets each row carry only the keys it needs, the result is
+always a plain `Tab` (no `columnDefs`), same as a `.tab` with no sparse column declared at all. And it only
+applies to reading (`parseTab`) — there is no equivalent way to generate YAML with `generateTab`.
+[!--lang:*-->
+
+```js
+tabPlus.parseTab('- a: "1"\n  b: one\n- b: "2"\n');
+// => {fields: ['a', 'b'], rows: [['1', 'one'], ['', '2']]}
+```
