@@ -11,6 +11,6 @@ permissions:
 
 jobs:
   publish:
-    uses: codenautas/.github/.github/workflows/npm-publish-from-tag.yaml@v1
+    uses: codenautas/.github/.github/workflows/npm-publish-from-tag.yaml@4c3d4aea7c37c6cb25bbb276975969ef5cb2c95a # v2
     with:
       node_version: '24'
