@@ -41,7 +41,7 @@
     "multilang": "^1.2.5",
     "nyc": "^18.0.0",
     "parallel-transform": "^1.2.0",
-    "qa-control": "^0.10.2",
+    "qa-control": "^0.11.1",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   },
@@ -57,13 +57,16 @@
     "docs": "multilang --check --verbose LEEME.md && multilang LEEME.md"
   },
   "qa-control": {
-    "gha": "skip",
+    "gha": {
+      "node_version": "26"
+    },
     "run-in": "both",
     "type": "lib",
     "silenced": [
       "first_lines_does_not_match_in_file_1",
       "eslint_warnings_in_file_1"
-    ]
+    ],
+    "sonar": true
   },
   "nyc": {
     "extension": [

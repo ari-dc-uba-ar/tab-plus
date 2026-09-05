@@ -8,4 +8,4 @@ on:
 
 jobs:
   ci:
-    uses: codenautas/.github/.github/workflows/node-build-and-test.yaml@4c3d4aea7c37c6cb25bbb276975969ef5cb2c95a # v2
+    uses: codenautas/.github/.github/workflows/node-build-and-test.yaml@v2

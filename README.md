@@ -7,7 +7,7 @@ Parser and generator for a safe variant of the pipe-separated format.
 [![npm-version](https://img.shields.io/npm/v/tab-plus.svg)](https://npmjs.org/package/tab-plus)
 [![downloads](https://img.shields.io/npm/dm/tab-plus.svg)](https://npmjs.org/package/tab-plus)
 [![build](https://github.com/ari-dc-uba-ar/tab-plus/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/ari-dc-uba-ar/tab-plus/actions/workflows/build-and-test.yml)
-[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=ari-dc-uba-ar_tab-plus&metric=alert_status)](https://sonarcloud.io/summary/overall?id=ari-dc-uba-ar_tab-plus)
+[![sonar](https://sonarcloud.io/api/project_badges/measure?project=ari-dc-uba-ar_tab-plus&metric=alert_status)](https://sonarcloud.io/summary/overall?id=ari-dc-uba-ar_tab-plus)
 [![qa-control](https://github.com/ari-dc-uba-ar/tab-plus/actions/workflows/qa-control.yml/badge.svg)](https://github.com/ari-dc-uba-ar/tab-plus/actions/workflows/qa-control.yml)
 
 
