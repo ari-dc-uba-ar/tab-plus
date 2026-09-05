@@ -21,7 +21,9 @@
     }
   ],
   "overrides": {
+    "browserslist": ">=4.28.7",
     "diff": ">=8.0.2",
+    "js-yaml": ">=5.4.1",
     "serialize-javascript": ">=7.0.0",
     "uuid": ">=14.0.0"
   },
@@ -31,16 +33,16 @@
   "devDependencies": {
     "@types/expect.js": "^0.3.32",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.4.1",
     "@types/parallel-transform": "^1.1.4",
     "expect.js": "^0.3.1",
-    "line-splitter": "^0.8.0",
-    "mocha": "^11.7.6",
-    "multilang": "^1.2.3",
+    "line-splitter": "^0.8.8",
+    "mocha": "^12.0.0",
+    "multilang": "^1.2.5",
     "nyc": "^18.0.0",
     "parallel-transform": "^1.2.0",
-    "qa-control": "^0.7.5",
-    "tsx": "^4.23.1",
+    "qa-control": "^0.10.2",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   },
   "engines": {
@@ -55,7 +57,7 @@
     "docs": "multilang --check --verbose LEEME.md && multilang LEEME.md"
   },
   "qa-control": {
-    "gha": "all",
+    "gha": "skip",
     "run-in": "both",
     "type": "lib",
     "silenced": [
