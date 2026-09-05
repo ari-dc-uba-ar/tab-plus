@@ -206,6 +206,11 @@ and `rows` is an array of arrays of field values (strings, plus `null` or the co
 applicable — see `emptyField` above), or an array of objects if `{objectRows: true}` is passed (see
 `objectRows` above). `options` is optional.
 
+If (once a leading BOM is stripped) the file's first character is `-` or `[`, the whole content is instead
+parsed as a single YAML document — an array of `column: value` mappings, one row per item — meant for tables
+with few rows and verbose values where YAML is more readable to hand-edit than `.tab`. See
+[Reading a whole `.tab` file as YAML](tab-plus.md#reading-a-whole-tab-file-as-yaml) for the details.
+
 ```js
 tabPlus.parseTab('a|b\r\n1|2\r\n');
 // => {fields: ['a', 'b'], rows: [['1', '2']]}

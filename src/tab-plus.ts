@@ -1,3 +1,5 @@
+import * as yaml from 'js-yaml';
+
 export type FieldValue = string | null | symbol;
 
 export interface Options {
@@ -476,13 +478,80 @@ export function getGenerateTransformer(options?: Options): GenerateTransformer {
     return transformer;
 }
 
+function stripBom(text: string): string {
+    return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+// a real `.tab` header never starts with '-' or '[' (those would be the first character of a column name, an
+// unusual but not truly ambiguous case the author accepts). parseTab uses that to let a whole file be authored
+// as YAML instead - much more readable by hand than `.tab` for a table with few, verbose rows (e.g.
+// backend-plus's `parameters` or `rules` tables) - see parseYamlTab for what's expected inside.
+const yamlArrayStart = /^[-[]/;
+
+function asYamlRowObject(rowItem: unknown): Record<string, unknown> {
+    if(typeof rowItem !== 'object' || rowItem === null || Array.isArray(rowItem)){
+        throw new Error('tab-plus: every item of a YAML .tab must be a mapping (row object), found ' + JSON.stringify(rowItem));
+    }
+    return rowItem as Record<string, unknown>;
+}
+
+// turns one value read off a YAML row object into a FieldValue: a key the row doesn't have uses
+// emptyFieldValue(options) (the same "nothing was written here" meaning an implicitly-empty `.tab` field
+// has), `null`/a string pass through as-is, and any other scalar (number, boolean) is stringified, since every
+// `.tab` field is a string or `null`.
+function yamlValueToField(value: unknown, options?: Options): FieldValue {
+    if(value === undefined){
+        return emptyFieldValue(options);
+    }
+    if(value === null || typeof value === 'string'){
+        return value;
+    }
+    return String(value);
+}
+
+// parses a `.tab` file's content as a YAML array of row objects (see the `yamlArrayStart` doc comment for
+// when this path is taken instead of the regular pipe-separated one). There is no sparse-columns concept
+// here - YAML already lets each row carry only the keys it needs - so this always returns a plain Tab:
+// `fields` is every key seen across all rows, in first-appearance order.
+function parseYamlTab(text: string, options?: Options): Tab {
+    const parsed: unknown = yaml.load(text);
+    if(!Array.isArray(parsed)){
+        throw new Error('tab-plus: a .tab file starting with "-" or "[" must be a YAML array of row objects');
+    }
+    const fields: string[] = [];
+    const seen = new Set<string>();
+    parsed.forEach(function(rowItem){
+        Object.keys(asYamlRowObject(rowItem)).forEach(function(key){
+            if(!seen.has(key)){
+                seen.add(key);
+                fields.push(key);
+            }
+        });
+    });
+    const rows = parsed.map(function(rowItem){
+        const rowObj = asYamlRowObject(rowItem);
+        return fields.map(function(field){
+            return yamlValueToField(rowObj[field], options);
+        });
+    });
+    return {fields, rows};
+}
+
 // parses the full content of a .tab file into {fields, rows}
 export function parseTab(text: string, options?: Options & {objectRows?: false}): Tab;
 export function parseTab(text: string, options: Options & {objectRows: true}): ObjectTab;
 export function parseTab(text: string, options?: Options): Tab | ObjectTab {
+    const content = String(text);
+    if(yamlArrayStart.test(stripBom(content))){
+        const tab = parseYamlTab(stripBom(content), options);
+        if(options && options.objectRows){
+            return {fields: tab.fields, rows: tab.rows.map(function(row){ return rowToObject(tab.fields, row); })};
+        }
+        return tab;
+    }
     const transformer = getParseTransformer(options);
     const rows: (FieldValue[] | RowObject)[] = [];
-    String(text).split(/\r?\n/).forEach(function(line){
+    content.split(/\r?\n/).forEach(function(line){
         transformer(line, function(err, row){
             if(err){ throw err; }
             // in array mode the transformer emits the header as the first row too; skip it here, it is

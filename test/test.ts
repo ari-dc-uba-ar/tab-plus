@@ -151,6 +151,64 @@ describe('parseTab', function(){
     });
 });
 
+describe('parseTab: a file starting with "-" or "[" is read as YAML', function(){
+    it('parses a YAML block sequence of row objects (leading "-")', function(){
+        const content = '- a: "1"\n  b: one\n- a: "2"\n  b: the second\n';
+        const tab = tabPlus.parseTab(content);
+        expect(tab.fields).to.eql(['a', 'b']);
+        expect(tab.rows).to.eql([['1', 'one'], ['2', 'the second']]);
+    });
+    it('parses a YAML flow sequence of row objects (leading "[")', function(){
+        const content = '[{a: "1", b: one}, {a: "2", b: the second}]';
+        const tab = tabPlus.parseTab(content);
+        expect(tab.fields).to.eql(['a', 'b']);
+        expect(tab.rows).to.eql([['1', 'one'], ['2', 'the second']]);
+    });
+    it('collects fields as the union of keys, in first-appearance order, across all rows', function(){
+        const content = '- a: "1"\n- b: "2"\n- a: "3"\n  c: "4"\n';
+        const tab = tabPlus.parseTab(content);
+        expect(tab.fields).to.eql(['a', 'b', 'c']);
+    });
+    it('defaults a key a row does not have to emptyFieldValue(options)', function(){
+        const content = '- a: "1"\n- b: "2"\n';
+        expect(tabPlus.parseTab(content).rows).to.eql([['1', ''], ['', '2']]);
+        expect(tabPlus.parseTab(content, {emptyField: 'null'}).rows).to.eql([['1', null], [null, '2']]);
+    });
+    it('a null value stays null and a string value passes through as-is', function(){
+        const content = '- a: null\n  b: ""\n  c: plain text\n';
+        const tab = tabPlus.parseTab(content);
+        expect(tab.rows).to.eql([[null, '', 'plain text']]);
+    });
+    it('stringifies non-string, non-null scalars (numbers, booleans)', function(){
+        const content = '- a: 1\n  b: true\n';
+        const tab = tabPlus.parseTab(content);
+        expect(tab.rows).to.eql([['1', 'true']]);
+    });
+    it('never produces columnDefs / sparse columns for a YAML-sourced table', function(){
+        const content = '- a: "1"\n  b: "2"\n';
+        const tab = tabPlus.parseTab(content);
+        expect(tab.columnDefs).to.be(undefined);
+    });
+    it('supports objectRows: true', function(){
+        const content = '- a: "1"\n- b: "2"\n';
+        const tab = tabPlus.parseTab(content, {objectRows: true});
+        expect(tab.fields).to.eql(['a', 'b']);
+        expect(tab.rows).to.eql([{a: '1', b: ''}, {a: '', b: '2'}]);
+    });
+    it('strips a leading UTF8 BOM before checking for/parsing YAML', function(){
+        const content = '﻿- a: "1"\n  b: one\n';
+        const tab = tabPlus.parseTab(content);
+        expect(tab.fields).to.eql(['a', 'b']);
+        expect(tab.rows).to.eql([['1', 'one']]);
+    });
+    it('throws if the YAML document is not an array', function(){
+        expect(function(){ tabPlus.parseTab('- a\n  b: 1\n'); }).to.throwError();
+    });
+    it('throws if a YAML array item is not a row object', function(){
+        expect(function(){ tabPlus.parseTab('- 1\n- 2\n'); }).to.throwError();
+    });
+});
+
 describe('objectRows option', function(){
     it('parseTab returns rows as arrays by default', function(){
         const tab = tabPlus.parseTab('a|b\r\n1|2\r\n');
