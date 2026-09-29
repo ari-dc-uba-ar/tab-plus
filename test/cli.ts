@@ -29,7 +29,7 @@ describe('cli sparse', function(){
     }
 
     function args(overrides: Partial<SparseArgs> & {filename: string}): SparseArgs {
-        return {under: undefined, fixed: undefined, sparse: undefined, output: undefined, ...overrides};
+        return {under: undefined, fixed: undefined, sparse: undefined, auto: undefined, output: undefined, ...overrides};
     }
 
     // 20 rows: 'mediterraneo' differs from 'false' on 1 row (5%, under the default 10%);
@@ -143,6 +143,28 @@ describe('cli sparse', function(){
         expect(function(){
             runSparse(args({filename: file, fixed: ['c2'], sparse: ['c2']}));
         }).to.throwError(/both --fixed and --sparse/);
+    });
+
+    it('--auto decides the listed columns by --under while --fixed columns and the unlisted ones keep their status', function(){
+        // 'estrellas' would qualify under --under 15% but it is not listed, so it keeps its original (regular)
+        // status; 'mediterraneo' is listed in --auto and qualifies
+        const file = writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
+        runSparse(args({filename: file, under: '15%', fixed: ['c2'], auto: ['mediterraneo']}));
+        const tab = tabPlus.parseTab(readOutput('countries-sparse.tab'));
+        expect(tab.columnDefs).to.eql({
+            c2: {position: 1}, estrellas: {position: 2},
+            mediterraneo: {position: 1, sparseDefault: 'false'}
+        });
+    });
+
+    it('throws when a column is listed in both --fixed and --auto, or in both --sparse and --auto', function(){
+        const file = writeInput('countries.tab', ['c2', 'estrellas', 'mediterraneo'], countryRows());
+        expect(function(){
+            runSparse(args({filename: file, fixed: ['c2'], auto: ['c2']}));
+        }).to.throwError(/both --fixed and --auto/);
+        expect(function(){
+            runSparse(args({filename: file, sparse: ['c2'], auto: ['c2']}));
+        }).to.throwError(/both --sparse and --auto/);
     });
 
     it('main() wires argv parsing through to runSparse', function(){

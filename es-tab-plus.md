@@ -60,8 +60,12 @@ misma ambigüedad que cualquier campo común, y se resuelve de la misma forma:
 * `columna:\E` — el valor por defecto es explícitamente la cadena vacía `''`.
 * `columna:\N` — el valor por defecto es explícitamente `null`.
 * `columna` (sin sufijo) — el valor por defecto es el que le corresponda a un campo sin contenido (dos
-  separadores pegados), según la opción `emptyField`: `''` por defecto, `null` con `emptyField: 'null'`, o el
-  symbol configurado con `emptyField: symbol`.
+  separadores pegados), según el `emptyField` de esa columna: `''` por defecto, `null` con `emptyField: 'null'`,
+  o el symbol configurado con `emptyField: symbol`.
+
+Al generar, el valor por defecto se escribe siempre de forma explícita (`:\E`, `:\N` o el valor), sin importar
+el `emptyField`, así el encabezado se entiende sin conocerlo. La única excepción es un valor por defecto que sea
+el symbol del `emptyField` de la columna, que no tiene forma explícita y se escribe sin sufijo.
 
 En cada fila de datos, la última columna contiene los pares `columna:valor` (los dos puntos son siempre
 obligatorios) de las columnas esparsas cuyo valor, en esa fila, difiere del valor por defecto declarado en el
@@ -81,8 +85,12 @@ and is resolved the same way:
 * `column:\E` — the default value is explicitly the empty string `''`.
 * `column:\N` — the default value is explicitly `null`.
 * `column` (no suffix) — the default value is whatever a field with no content at all (two adjacent
-  separators) would be, per the `emptyField` option: `''` by default, `null` with `emptyField: 'null'`, or the
-  configured symbol with `emptyField: symbol`.
+  separators) would be, per that column's `emptyField`: `''` by default, `null` with `emptyField: 'null'`, or
+  the configured symbol with `emptyField: symbol`.
+
+When generating, the default value is always written explicitly (`:\E`, `:\N` or the value), whatever the
+`emptyField` is, so the header can be understood without knowing it. The only exception is a default value that
+is the symbol of the column's `emptyField`, which has no explicit form and is written with no suffix.
 
 In each data row, the last column holds the `column:value` pairs (the colon is always mandatory) for the sparse
 columns whose value, on that row, differs from the default declared in the header. Pairs are also separated by
@@ -207,6 +215,9 @@ del bloque esparso al generar.
 * una columna esparsa tiene como valor `{position: number, sparseDefault: valor}`, con el valor por defecto
   declarado en el encabezado para esa columna (ver la sección de sintaxis para cómo se resuelve sin sufijo
   `:valor`).
+* cualquiera de las dos puede llevar además `emptyField`, que reemplaza a `options.emptyField` solo para esa
+  columna (ver "`emptyField` por columna" en el [LEEME](LEEME.md)). No se escribe en el archivo: al parsear
+  viene de `options.columnDefs`.
 
 `generateTab` acepta `columnDefs` de la misma forma (junto con `rows`), de forma igualmente opcional: sin
 `columnDefs`, genera un `.tab` común, sin ninguna columna esparsa (retrocompatible con el formato de antes de
@@ -234,6 +245,9 @@ sparse block when generating.
 * a sparse column has `{position: number, sparseDefault: value}` as its value, with the default value
   declared in the header for that column (see the syntax section above for how it's resolved without a
   `:value` suffix).
+* either one can also carry `emptyField`, which replaces `options.emptyField` for that column only (see
+  "`emptyField` per column" in the [README](README.md)). It isn't written to the file: when parsing it comes
+  from `options.columnDefs`.
 
 `generateTab` accepts `columnDefs` the same way (alongside `rows`), just as optionally: without `columnDefs`,
 it generates a plain `.tab`, with no sparse columns at all (backwards compatible with the format before this

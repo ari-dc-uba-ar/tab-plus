@@ -134,10 +134,11 @@ describe('sparse columns: permissive mode (options.strict: false)', function(){
 });
 
 describe('sparse columns: generating', function(){
-    it('round-trips the doc example through parseTab/generateTab', function(){
+    it('round-trips the doc example through parseTab/generateTab, writing the bare default explicitly', function(){
         const tab = tabPlus.parseTab(countriesContent);
         const text = tabPlus.generateTab(tab, {eol: '\r\n'});
-        expect(text).to.eql(countriesContent);
+        expect(text).to.eql(countriesContent.replace('\\: estrellas ', '\\: estrellas:\\E '));
+        expect(tabPlus.generateTab(tabPlus.parseTab(text), {eol: '\r\n'})).to.eql(text);
     });
     it('generates the header\'s \\: marker with declared defaults', function(){
         const tab: tabPlus.Tab = {
@@ -180,14 +181,14 @@ describe('sparse columns: generating', function(){
         expect(text).to.eql('id|\\: status:\\N\r\n1|status:on\\shold\r\n2|\r\n');
         expect(tabPlus.parseTab(text)).to.eql(tab);
     });
-    it('an empty-string sparseDefault is written bare (no suffix), matching what an implicitly-empty field means by default', function(){
+    it('an empty-string sparseDefault is written with an explicit ":\\E" suffix, even when it is what an implicitly-empty field means', function(){
         const tab: tabPlus.Tab = {
             fields: ['id', 'status'],
             columnDefs: {id: {position: 1}, status: {position: 1, sparseDefault: ''}},
             rows: [['1', 'on hold'], ['2', '']]
         };
         const text = tabPlus.generateTab(tab, {eol: '\r\n'});
-        expect(text).to.eql('id|\\: status\r\n1|status:on\\shold\r\n2|\r\n');
+        expect(text).to.eql('id|\\: status:\\E\r\n1|status:on\\shold\r\n2|\r\n');
         expect(tabPlus.parseTab(text)).to.eql(tab);
     });
     it('escapes a literal space in a sparse column\'s declared default, and round-trips it back through parseTab', function(){
@@ -223,5 +224,102 @@ describe('sparse columns: parseRow/generateRow with an explicit columnDefs', fun
         const plain: tabPlus.ColumnDefs = {a: {position: 1}, b: {position: 2}};
         expect(tabPlus.parseRow('1|2', undefined, plain)).to.eql(['1', '2']);
         expect(tabPlus.generateRow(['1', '2'], undefined, plain)).to.eql('1|2');
+    });
+});
+
+describe('emptyField "both"', function(){
+    it('generates both null and \'\' as a field with no content at all', function(){
+        expect(tabPlus.generateRow(['a', null, '', undefined, 'b'], {emptyField: 'both'})).to.eql('a||||b');
+    });
+    it('cannot be used for parsing', function(){
+        expect(function(){ tabPlus.parseRow('a||b', {emptyField: 'both'}); }).to.throwError(/only be used for generating/);
+        expect(function(){ tabPlus.parseTab('a|b\r\n1|2\r\n', {emptyField: 'both'}); }).to.throwError(/only be used for generating/);
+        expect(function(){ tabPlus.unescapeField('x', {emptyField: 'both'}); }).to.throwError(/only be used for generating/);
+        expect(function(){ tabPlus.emptyFieldValue({emptyField: 'both'}); }).to.throwError(/only be used for generating/);
+    });
+    it('still writes a sparse default explicitly in the header, and a differing \'\' or null as an empty pair', function(){
+        const tab: tabPlus.Tab = {
+            fields: ['id', 'a', 'b'],
+            columnDefs: {id: {position: 1}, a: {position: 1, sparseDefault: null}, b: {position: 2, sparseDefault: ''}},
+            rows: [['1', '', null], ['2', null, '']]
+        };
+        expect(tabPlus.generateTab(tab, {eol: '\r\n', emptyField: 'both'})).to.eql('id|\\: a:\\N b:\\E\r\n1|a: b:\r\n2|\r\n');
+    });
+});
+
+describe('emptyField per column', function(){
+    const perColumn: tabPlus.Options['columnDefs'] = {a: {emptyField: 'null'}, b: {emptyField: 'string'}};
+    const plainText = 'id|a|b\r\n1||\r\n2|\\E|\\N\r\n';
+    const plainRows: FieldValue[][] = [['1', null, ''], ['2', '', null]];
+
+    it('options.columnDefs sets the emptyField of each column when generating a plain .tab', function(){
+        expect(tabPlus.generateTab({fields: ['id', 'a', 'b'], rows: plainRows}, {eol: '\r\n', columnDefs: perColumn})).to.eql(plainText);
+    });
+    it('options.columnDefs sets the emptyField of each column when parsing a plain .tab', function(){
+        expect(tabPlus.parseTab(plainText, {columnDefs: perColumn}).rows).to.eql(plainRows);
+    });
+    it('a ColumnDef\'s own emptyField works the same as options.columnDefs', function(){
+        const tab: tabPlus.Tab = {
+            fields: ['id', 'a', 'b'],
+            columnDefs: {id: {position: 1}, a: {position: 2, emptyField: 'null'}, b: {position: 3, emptyField: 'string'}},
+            rows: plainRows
+        };
+        expect(tabPlus.generateTab(tab, {eol: '\r\n'})).to.eql(plainText);
+    });
+    it('overrides options.emptyField only for the columns it names', function(){
+        expect(tabPlus.generateTab({fields: ['a', 'c'], rows: [[null, null]]}, {eol: '\r\n', emptyField: 'string', columnDefs: perColumn}))
+            .to.eql('a|c\r\n|\\N\r\n');
+    });
+    it('throws when a ColumnDef\'s emptyField differs from options.columnDefs', function(){
+        const tab: tabPlus.Tab = {fields: ['a'], columnDefs: {a: {position: 1, emptyField: 'string'}}, rows: []};
+        expect(function(){ tabPlus.generateTab(tab, {columnDefs: perColumn}); }).to.throwError(/differs from options.columnDefs/);
+    });
+    it('parseRow/generateRow apply options.columnDefs to the given columnDefs', function(){
+        const columnDefs: tabPlus.ColumnDefs = {a: {position: 1}, b: {position: 2}};
+        expect(tabPlus.parseRow('|', {columnDefs: perColumn}, columnDefs)).to.eql([null, '']);
+        expect(tabPlus.generateRow([null, ''], {columnDefs: perColumn}, columnDefs)).to.eql('|');
+    });
+    it('parseRow/generateRow throw when given options.columnDefs without a columnDefs to name the columns', function(){
+        expect(function(){ tabPlus.parseRow('|', {columnDefs: perColumn}); }).to.throwError(/needs a columnDefs/);
+        expect(function(){ tabPlus.generateRow([null, ''], {columnDefs: perColumn}); }).to.throwError(/needs a columnDefs/);
+    });
+    it('a bare sparse default in the header is read with the column\'s emptyField', function(){
+        const tab = tabPlus.parseTab('id|\\: a b\r\n1|\r\n', {columnDefs: perColumn});
+        expect(tab.columnDefs).to.eql({
+            id: {position: 1},
+            a: {position: 1, sparseDefault: null, emptyField: 'null'},
+            b: {position: 2, sparseDefault: '', emptyField: 'string'}
+        });
+    });
+    it('the values in the sparse block are written and read with the column\'s emptyField', function(){
+        const tab: tabPlus.Tab = {
+            fields: ['id', 'a', 'b'],
+            columnDefs: {id: {position: 1}, a: {position: 1, sparseDefault: 'x'}, b: {position: 2, sparseDefault: 'x'}},
+            rows: [['1', null, ''], ['2', '', null]]
+        };
+        const text = tabPlus.generateTab(tab, {eol: '\r\n', columnDefs: perColumn});
+        expect(text).to.eql('id|\\: a:x b:x\r\n1|a: b:\r\n2|a:\\E b:\\N\r\n');
+        expect(tabPlus.parseTab(text, {columnDefs: perColumn}).rows).to.eql(tab.rows);
+    });
+    it('keeps \'\' and null apart in the sparse block with a global emptyField "null"', function(){
+        const tab: tabPlus.Tab = {
+            fields: ['a', 'b'],
+            columnDefs: {a: {position: 1}, b: {position: 1, sparseDefault: 'x'}},
+            rows: [['1', ''], ['2', null]]
+        };
+        const text = tabPlus.generateTab(tab, {eol: '\r\n', emptyField: 'null'});
+        expect(text).to.eql('a|\\: b:x\r\n1|b:\\E\r\n2|b:\r\n');
+        expect(tabPlus.parseTab(text, {emptyField: 'null'}).rows).to.eql(tab.rows);
+    });
+    it('a symbol sparse default that is the column\'s emptyField is left bare in the header', function(){
+        const missing = Symbol('missing');
+        const tab: tabPlus.Tab = {
+            fields: ['id', 'a'],
+            columnDefs: {id: {position: 1}, a: {position: 1, sparseDefault: missing, emptyField: missing}},
+            rows: [['1', missing], ['2', 'y']]
+        };
+        const text = tabPlus.generateTab(tab, {eol: '\r\n'});
+        expect(text).to.eql('id|\\: a\r\n1|\r\n2|a:y\r\n');
+        expect(tabPlus.parseTab(text, {columnDefs: {a: {emptyField: missing}}}).rows).to.eql(tab.rows);
     });
 });

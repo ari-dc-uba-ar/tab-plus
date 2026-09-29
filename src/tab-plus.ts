@@ -1,13 +1,23 @@
 export type FieldValue = string | null | symbol;
 
+// 'both' is only for generating: both `null` and `''` are written as a field with no content at all
+export type EmptyField = 'string' | 'null' | 'both' | symbol;
+
+// per-column settings that are not part of the file: the producer and the consumer know them beforehand
+export interface ColumnOptions {
+    emptyField?: EmptyField;
+}
+
 export interface Options {
-    emptyField?: 'string' | 'null' | symbol;
+    emptyField?: EmptyField;
     objectRows?: boolean;
     eol?: string;
     strict?: boolean;
     defaultValue?: FieldValue;
     repeatedColumn?: 'first' | 'last';
     unknownColumn?: string;
+    // per-column settings, by column name, merged into the columnDefs read from (or given for) the header
+    columnDefs?: {[field: string]: ColumnOptions};
 }
 
 // suggested values for options.strict/defaultValue/repeatedColumn/unknownColumn in permissive mode; spread
@@ -20,8 +30,9 @@ export const permissiveOptions: {strict: false; defaultValue: FieldValue; repeat
 };
 
 // a regular column just needs its position (1-based, among regular columns) to fix its place in a row; a
-// sparse column also carries the default value declared for it in the header's `\:` section
-export interface ColumnDef {
+// sparse column also carries the default value declared for it in the header's `\:` section. `emptyField`
+// overrides options.emptyField for that column only
+export interface ColumnDef extends ColumnOptions {
     position: number;
     sparseDefault?: FieldValue;
 }
@@ -87,9 +98,11 @@ function toHex(char: string): string {
 
 // options.emptyField: how a field with no content at all (adjacent separators, e.g. `a||b`) is parsed/generated:
 // 'string' (default, backwards compatible) means it is an empty string; 'null' means it is `null`; passing a
-// symbol means it is that symbol (handy as a sentinel distinct from any real string or `null` value).
+// symbol means it is that symbol (handy as a sentinel distinct from any real string or `null` value); 'both'
+// (generating only) writes both `''` and `null` that way, so it has no value to parse back to.
 // Regardless of this option, `\E` always means an explicit empty string and `\N` always means an explicit `null`.
 export function emptyFieldValue(options?: Options): FieldValue {
+    assertParseable(options);
     const emptyField = options && options.emptyField;
     if(emptyField === 'null'){
         return null;
@@ -100,8 +113,15 @@ export function emptyFieldValue(options?: Options): FieldValue {
     return '';
 }
 
+function assertParseable(options?: Options): void {
+    if(options && options.emptyField === 'both'){
+        throw new Error('tab-plus: emptyField "both" can only be used for generating, not for parsing');
+    }
+}
+
 // turns the raw (still escaped) text of one field into its real value
 export function unescapeField(rawValue: string, options?: Options): FieldValue {
+    assertParseable(options);
     const trimmed = rawValue.trimEnd();
     if(trimmed === explicitEmpty){
         return '';
@@ -125,11 +145,10 @@ export function unescapeField(rawValue: string, options?: Options): FieldValue {
 
 // turns a field's real value into raw (escaped) text safe to embed between '|' separators
 export function escapeField(value: FieldValue | undefined, options?: Options): string {
-    const emptyValue = emptyFieldValue(options);
     if(value == null){
         value = null;
     }
-    if(value === emptyValue){
+    if(options && options.emptyField === 'both' ? value === null || value === '' : value === emptyFieldValue(options)){
         return '';
     }
     if(value === null){
@@ -166,6 +185,36 @@ function orderedFieldsOf(columnDefs: ColumnDefs): {common: string[]; sparse: str
         return columnDefs[a].position - columnDefs[b].position;
     }
     return {common: common.sort(byPosition), sparse: sparse.sort(byPosition)};
+}
+
+// the options that apply to one column: options.emptyField overridden by the column's own emptyField, if any
+function columnOptions(options: Options | undefined, columnDef: ColumnOptions | undefined): Options | undefined {
+    if(!columnDef || columnDef.emptyField === undefined){
+        return options;
+    }
+    return Object.assign({}, options, {emptyField: columnDef.emptyField});
+}
+
+// a copy of columnDefs with options.columnDefs merged in (only for the columns columnDefs has). A column that
+// already has its own emptyField must agree with options.columnDefs, otherwise it is unclear which one applies
+function mergeColumnOptions(columnDefs: ColumnDefs, options?: Options): ColumnDefs {
+    const given = options && options.columnDefs;
+    if(!given){
+        return columnDefs;
+    }
+    const merged: ColumnDefs = Object.assign({}, columnDefs);
+    Object.keys(given).forEach(function(field){
+        const columnDef = merged[field];
+        const emptyField = given[field].emptyField;
+        if(columnDef === undefined || emptyField === undefined){
+            return;
+        }
+        if(columnDef.emptyField !== undefined && columnDef.emptyField !== emptyField){
+            throw new Error('tab-plus: column "' + field + '" has an emptyField in columnDefs that differs from options.columnDefs');
+        }
+        merged[field] = Object.assign({}, columnDef, {emptyField});
+    });
+    return merged;
 }
 
 // splits the (still escaped) name:value text of one sparse-column pair on its first unescaped ':'
@@ -222,11 +271,14 @@ function parseSparseBlock(rawBlock: string, sparseFields: string[], options?: Op
 
 // generates the raw text of the trailing sparse-columns field of a data row: 'name:value' pairs (in
 // sparseFields order) for the columns whose value differs from its columnDefs.sparseDefault
-function generateSparseBlock(values: Map<string, FieldValue | undefined>, sparseFields: string[], columnDefs: ColumnDefs): string {
+function generateSparseBlock(
+    values: Map<string, FieldValue | undefined>, sparseFields: string[], columnDefs: ColumnDefs, options?: Options
+): string {
     return sparseFields.filter(function(field){
         return values.get(field) !== columnDefs[field].sparseDefault;
     }).map(function(field){
-        return escapeField(field).replace(/ /g, '\\s') + ':' + escapeField(values.get(field)).replace(/ /g, '\\s');
+        return escapeField(field).replace(/ /g, '\\s') + ':' +
+            escapeField(values.get(field), columnOptions(options, columnDefs[field])).replace(/ /g, '\\s');
     }).join(' ');
 }
 
@@ -237,6 +289,22 @@ function generateSparseBlock(values: Map<string, FieldValue | undefined>, sparse
 // position order) followed by sparse columns (in their own columnDefs position order) - see the `columnDefs`
 // doc section.
 export function parseRow(rawRow: string, options?: Options, columnDefs?: ColumnDefs): FieldValue[] {
+    return parseRowWith(rawRow, options, columnDefsFor(columnDefs, options));
+}
+
+// options.columnDefs is keyed by column name, so it needs a columnDefs to know which column is which
+function columnDefsFor(columnDefs: ColumnDefs | undefined, options?: Options): ColumnDefs | undefined {
+    if(!columnDefs){
+        if(options && options.columnDefs){
+            throw new Error('tab-plus: options.columnDefs needs a columnDefs to know the name of each column');
+        }
+        return columnDefs;
+    }
+    return mergeColumnOptions(columnDefs, options);
+}
+
+// parseRow with options.columnDefs already merged into columnDefs
+function parseRowWith(rawRow: string, options?: Options, columnDefs?: ColumnDefs): FieldValue[] {
     const rawFields = rawRow.split(unescapedPipe);
     if(!columnDefs){
         return rawFields.map(function(rawValue){
@@ -245,20 +313,22 @@ export function parseRow(rawRow: string, options?: Options, columnDefs?: ColumnD
     }
     const {common, sparse} = orderedFieldsOf(columnDefs);
     if(sparse.length === 0){
-        return rawFields.map(function(rawValue){
-            return unescapeField(rawValue, options);
+        return rawFields.map(function(rawValue, i){
+            return unescapeField(rawValue, columnOptions(options, columnDefs[common[i]]));
         });
     }
     if(rawFields.length !== common.length + 1){
         throw new Error('tab-plus: row has ' + rawFields.length + ' fields, expected ' +
             (common.length + 1) + ' (' + common.length + ' common + 1 sparse-columns block)');
     }
-    const commonValues = rawFields.slice(0, common.length).map(function(rawValue){
-        return unescapeField(rawValue, options);
+    const commonValues = rawFields.slice(0, common.length).map(function(rawValue, i){
+        return unescapeField(rawValue, columnOptions(options, columnDefs[common[i]]));
     });
     const parsedSparse = parseSparseBlock(rawFields[common.length], sparse, options);
     const sparseValues = sparse.map(function(field){
-        return parsedSparse.has(field) ? unescapeField(parsedSparse.get(field)!, options) : columnDefs[field].sparseDefault!;
+        return parsedSparse.has(field) ?
+            unescapeField(parsedSparse.get(field)!, columnOptions(options, columnDefs[field])) :
+            columnDefs[field].sparseDefault!;
     });
     return commonValues.concat(sparseValues);
 }
@@ -269,6 +339,11 @@ export function parseRow(rawRow: string, options?: Options, columnDefs?: ColumnD
 // columns, both by columnDefs position); this function splits it back into the common '|' separated fields
 // plus a trailing sparse-columns block, only emitting the columns that differ from their sparseDefault.
 export function generateRow(row: (FieldValue | undefined)[], options?: Options, columnDefs?: ColumnDefs): string {
+    return generateRowWith(row, options, columnDefsFor(columnDefs, options));
+}
+
+// generateRow with options.columnDefs already merged into columnDefs
+function generateRowWith(row: (FieldValue | undefined)[], options?: Options, columnDefs?: ColumnDefs): string {
     if(!columnDefs){
         return row.map(function(value){
             return escapeField(value, options);
@@ -276,18 +351,18 @@ export function generateRow(row: (FieldValue | undefined)[], options?: Options, 
     }
     const {common, sparse} = orderedFieldsOf(columnDefs);
     if(sparse.length === 0){
-        return row.map(function(value){
-            return escapeField(value, options);
+        return row.map(function(value, i){
+            return escapeField(value, columnOptions(options, columnDefs[common[i]]));
         }).join('|');
     }
-    const commonRaw = row.slice(0, common.length).map(function(value){
-        return escapeField(value, options);
+    const commonRaw = row.slice(0, common.length).map(function(value, i){
+        return escapeField(value, columnOptions(options, columnDefs[common[i]]));
     });
     const values = new Map<string, FieldValue | undefined>();
     sparse.forEach(function(field, i){
         values.set(field, row[common.length + i]);
     });
-    return commonRaw.concat([generateSparseBlock(values, sparse, columnDefs)]).join('|');
+    return commonRaw.concat([generateSparseBlock(values, sparse, columnDefs, options)]).join('|');
 }
 
 function rowToObject(fields: FieldValue[], row: FieldValue[]): RowObject {
@@ -331,9 +406,11 @@ function isSkippableLine(line: string): boolean {
 //
 // a bare `name` (no `:` at all) has the exact same ambiguity as two adjacent field separators (e.g. `a||b`):
 // unescapeField('', options) resolves it the same way in both places, so it means `''`/`null`/the configured
-// symbol depending on options.emptyField, exactly like an implicitly-empty regular field. `name:\E` and
-// `name:\N` still force an explicit `''` or `null` regardless of options.emptyField, same as any other field.
+// symbol depending on the column's emptyField (see options.columnDefs), exactly like an implicitly-empty
+// regular field. `name:\E` and `name:\N` still force an explicit `''` or `null` regardless of emptyField, same
+// as any other field.
 function parseHeaderFields(rawFields: string[], options?: Options): {fields: FieldValue[]; columnDefs: ColumnDefs} {
+    const given = (options && options.columnDefs) || {};
     const lastRaw = rawFields[rawFields.length - 1];
     const hasSparseSection = rawFields.length > 0 && lastRaw !== undefined && sparseHeaderMarker.test(lastRaw);
     const commonRaw = hasSparseSection ? rawFields.slice(0, -1) : rawFields;
@@ -348,24 +425,29 @@ function parseHeaderFields(rawFields: string[], options?: Options): {fields: Fie
     const sparseFields = sparseEntries.filter(function(rawEntry){ return rawEntry !== ''; }).map(function(rawEntry, i){
         const split = splitSparsePair(rawEntry);
         const field = String(unescapeField(split ? split.rawName : rawEntry));
-        columnDefs[field] = {position: i + 1, sparseDefault: unescapeField(split ? split.rawValue : '', options)};
+        const fieldOptions = Object.prototype.hasOwnProperty.call(given, field) ? columnOptions(options, given[field]) : options;
+        columnDefs[field] = {position: i + 1, sparseDefault: unescapeField(split ? split.rawValue : '', fieldOptions)};
         return field;
     });
     if(options && options.unknownColumn && !Object.prototype.hasOwnProperty.call(columnDefs, options.unknownColumn)){
         columnDefs[options.unknownColumn] = {position: sparseFields.length + 1, sparseDefault: null};
         sparseFields.push(options.unknownColumn);
     }
-    return {fields: commonFields.concat(sparseFields), columnDefs};
+    return {fields: commonFields.concat(sparseFields), columnDefs: mergeColumnOptions(columnDefs, options)};
 }
+
+// used as emptyField when writing a sparse default in the header, so that `''` and `null` are always written
+// explicitly (`\E`, `\N`): no real value can match it
+const noImplicitEmpty = Symbol('no implicit empty');
 
 // generates a header line from {fields, columnDefs}: common columns '|' separated as usual, followed (only
 // when columnDefs declares at least one sparse column) by the `\:` marker and the space-separated
 // `name`/`name:default` entries, in columnDefs position order - the inverse of parseHeaderFields
 //
-// a sparseDefault is left as a bare `name` (no suffix) exactly when escapeField would otherwise generate it
-// implicitly (i.e. it equals options.emptyField's value - '' by default), matching parseHeaderFields reading
-// a bare `name` back the same way; any other default (including `null` when emptyField isn't 'null', or `''`
-// when it's not the default 'string' mode) gets its explicit `:\N`/`:\E`/literal suffix from escapeField
+// a sparseDefault is always written explicitly (`:\N`, `:\E` or the literal value), whatever the column's
+// emptyField is; the only exception is a symbol default, which has no explicit form: it is left as a bare
+// `name` (no suffix) when it is the column's emptyField symbol (matching parseHeaderFields reading a bare
+// `name` back the same way), and any other symbol throws
 function generateHeaderFields(fields: FieldValue[], columnDefs: ColumnDefs, options?: Options): string {
     const {common, sparse} = orderedFieldsOf(columnDefs);
     const commonRaw = fields.slice(0, common.length).map(function(field){
@@ -376,7 +458,11 @@ function generateHeaderFields(fields: FieldValue[], columnDefs: ColumnDefs, opti
     }
     const sparseRaw = sparse.map(function(field){
         const rawName = escapeField(field).replace(/ /g, '\\s');
-        const rawDefault = escapeField(columnDefs[field].sparseDefault!, options).replace(/ /g, '\\s');
+        const fieldOptions = columnOptions(options, columnDefs[field]);
+        const emptyField = fieldOptions && fieldOptions.emptyField;
+        const rawDefault = escapeField(columnDefs[field].sparseDefault!, {
+            emptyField: typeof emptyField === 'symbol' ? emptyField : noImplicitEmpty
+        }).replace(/ /g, '\\s');
         return rawDefault === '' ? rawName : rawName + ':' + rawDefault;
     });
     return commonRaw.concat(['\\: ' + sparseRaw.join(' ')]).join('|');
@@ -430,7 +516,7 @@ export function getParseTransformer(options?: Options): ParseTransformer {
                     transformer.columnDefs = columnDefs;
                     return callback(null, options && options.objectRows ? null : fields);
                 }
-                const row = parseRow(line, options, transformer.columnDefs!);
+                const row = parseRowWith(line, options, transformer.columnDefs!);
                 return callback(null, options && options.objectRows ? rowToObject(transformer.fields, row) : row);
             }catch(err){
                 return callback(asError(err));
@@ -453,16 +539,14 @@ export function getGenerateTransformer(options?: Options): GenerateTransformer {
                 if(transformer.fields === null){
                     const fields = Array.isArray(row) ? row.map(function(value){ return value === undefined ? null : value; }) : Object.keys(row);
                     transformer.fields = fields;
-                    if(transformer.columnDefs === null){
-                        transformer.columnDefs = plainColumnDefs(fields);
-                    }
+                    transformer.columnDefs = mergeColumnOptions(transformer.columnDefs || plainColumnDefs(fields), options);
                     const headerLine = generateHeaderFields(fields, transformer.columnDefs, options);
                     if(Array.isArray(row)){
                         return callback(null, headerLine);
                     }
-                    return callback(null, [headerLine, generateRow(objectRowToArray(fields, row), options, transformer.columnDefs)]);
+                    return callback(null, [headerLine, generateRowWith(objectRowToArray(fields, row), options, transformer.columnDefs)]);
                 }
-                return callback(null, generateRow(
+                return callback(null, generateRowWith(
                     Array.isArray(row) ? row : objectRowToArray(transformer.fields, row),
                     options,
                     transformer.columnDefs!

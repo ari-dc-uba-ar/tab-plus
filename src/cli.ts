@@ -22,22 +22,30 @@ export interface SparseArgs {
     under: string | undefined;
     fixed: string[] | undefined;
     sparse: string[] | undefined;
+    auto: string[] | undefined;
     output: string | undefined;
 }
 
-export function runSparse(args: SparseArgs): void {
-    if(args.fixed && args.sparse){
-        const overlap = args.fixed.filter(function(column){ return args.sparse!.indexOf(column) !== -1; });
+function checkOverlap(nameA: string, listA: string[] | undefined, nameB: string, listB: string[] | undefined): void {
+    if(listA && listB){
+        const overlap = listA.filter(function(column){ return listB.indexOf(column) !== -1; });
         if(overlap.length){
-            throw new Error('tab-plus sparse: column(s) listed in both --fixed and --sparse: ' + overlap.join(', '));
+            throw new Error('tab-plus sparse: column(s) listed in both ' + nameA + ' and ' + nameB + ': ' + overlap.join(', '));
         }
     }
+}
+
+export function runSparse(args: SparseArgs): void {
+    checkOverlap('--fixed', args.fixed, '--sparse', args.sparse);
+    checkOverlap('--fixed', args.fixed, '--auto', args.auto);
+    checkOverlap('--sparse', args.sparse, '--auto', args.auto);
     const text = fs.readFileSync(args.filename, 'utf-8');
     const tab = parseTab(text);
     const decided = decideSparseColumns(tab.fields, tab.rows, tab.columnDefs, {
         under: args.under === undefined ? defaultThreshold : parseThreshold(args.under),
         fixed: args.fixed,
-        sparse: args.sparse
+        sparse: args.sparse,
+        auto: args.auto
     });
 
     // generateTab expects row values in `decided.fields` order once given as objects; row objects sidestep
@@ -79,6 +87,11 @@ const sparseCommand = command({
             type: commaList,
             description: 'comma-separated columns to force sparse; other columns keep the computed/original status'
         },
+        auto: {
+            type: commaList,
+            description: 'comma-separated columns to decide by the --under threshold even when --fixed/--sparse ' +
+                'are given; other columns keep the computed/original status'
+        },
         output: {
             type: String,
             alias: 'o',
@@ -98,6 +111,7 @@ const sparseCommand = command({
         under: argv.flags.under,
         fixed: argv.flags.fixed,
         sparse: argv.flags.sparse,
+        auto: argv.flags.auto,
         output: argv.flags.output
     });
 });

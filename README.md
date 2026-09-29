@@ -96,7 +96,8 @@ commas is enough.
 ### The `emptyField` option
 
 `parseTab`, `generateTab`, `parseRow`, `generateRow`, `unescapeField` and `escapeField` all accept an optional
-`options` argument with an `emptyField` property: `'string'` (the default), `'null'`, or a `symbol`.
+`options` argument with an `emptyField` property: `'string'` (the default), `'null'`, `'both'` (generating
+only), or a `symbol`.
 
 * `'string'` (default): a field with no content at all parses as `''`; a `null` value is generated explicitly
   as `\N` (since implicit-empty already means `''`).
@@ -108,11 +109,31 @@ commas is enough.
   field left blank to mean "use whatever the column's definition says" (its schema default, or leave it
   untouched), while `\E` and `\N` still let you force an empty string or `NULL` regardless of that definition.
   Generating a field for any other symbol throws.
+* `'both'` (generating only): both `''` and `null` are generated as a field with no content at all. Handy for
+  a producer that doesn't tell them apart (for example, a database where `NULL` and `''` are the same thing).
+  Since the file doesn't keep which of the two it was, parsing with `'both'` throws: the reader has to pick
+  `'string'`, `'null'` or a symbol.
 
 In every mode `\E` always parses as `''` and `\N` always parses as `null`, and `generateTab`/`generateRow` never
 need to emit them for the "default" value of the chosen mode — only for the non-default ones — so a round trip
 through `generateTab`/`parseTab` (or `generateRow`/`parseRow`) with the same options always preserves `''`,
-`null` and the configured symbol as distinct values.
+`null` and the configured symbol as distinct values (except with `'both'`, which precisely doesn't tell them
+apart).
+
+#### `emptyField` per column
+
+Each column can have its own `emptyField`, which replaces the one in `options` for that column only. It isn't
+part of the file: the producer and the consumer know it beforehand (for example, because they deduce it from
+the table definition). There are two equivalent ways to give it:
+
+* in `options.columnDefs`, an object keyed by column name: `{columnDefs: {column: {emptyField: 'null'}}}`.
+  This is the way to give it when parsing, since there `columnDefs` comes from the file's header; it is
+  merged with what comes from the file when the header is read. Columns that aren't in the file are ignored.
+* in the `emptyField` of each `columnDefs` entry (see [sparse columns](tab-plus.md)), when generating with
+  `generateTab` or when using `parseRow`/`generateRow` with `columnDefs`.
+
+If a column has an `emptyField` in both places and they differ, it throws. `parseRow`/`generateRow` with
+`options.columnDefs` also need the `columnDefs` argument to know each column's name; without it they throw.
 
 ```js
 tabPlus.parseRow('a||b', {emptyField: 'null'});
@@ -127,6 +148,15 @@ tabPlus.parseRow('a||b', {emptyField: missing});
 // => ['a', missing, 'b']
 tabPlus.generateRow(['a', null, ''], {emptyField: missing});
 // => 'a|\\N|\\E'
+
+tabPlus.generateRow(['a', null, '', 'b'], {emptyField: 'both'});
+// => 'a|||b'
+
+var perColumn = {columnDefs: {a: {emptyField: 'null'}, b: {emptyField: 'string'}}};
+tabPlus.generateTab({fields: ['id', 'a', 'b'], rows: [['1', null, ''], ['2', '', null]]}, perColumn);
+// => 'id|a|b\r\n1||\r\n2|\\E|\\N\r\n'
+tabPlus.parseTab('id|a|b\r\n1||\r\n2|\\E|\\N\r\n', perColumn).rows;
+// => [['1', null, ''], ['2', '', null]]
 ```
 
 ### The `objectRows` option
@@ -182,9 +212,13 @@ Options:
 * `--sparse col1,col2,...`: forces those (comma-separated) columns to become sparse regardless of the
   threshold (picking, among the 7 candidates, whichever leaves the fewest rows differing). Unlisted columns
   behave the same as with `--fixed`: they stay as they were in the original.
+* `--auto col1,col2,...`: those (comma-separated) columns are decided by `--under` even when `--fixed` or
+  `--sparse` are given. Useful, for example, to add new columns to an existing file while leaving the columns
+  it already had as they were. Unlisted columns behave the same as with `--fixed`.
 * `--output file.tab`: output filename.
 
-Without `--fixed` or `--sparse`, every column is decided by `--under` (10% by default).
+A column can't be in more than one of the `--fixed`, `--sparse` and `--auto` lists. Without any of the three,
+every column is decided by `--under` (10% by default).
 
 > The file this command generates can be read back with `tabPlus.parseTab` (`columnDefs` included), and running
 > it through `tab-plus sparse` again lets you adjust specific columns' sparseness without touching the rest.
@@ -237,9 +271,11 @@ separate behavior for a missing array entry vs. an explicit `null`.
 
 ### Types
 
-The package exports the TypeScript types `FieldValue` (`string | null | symbol`), `Options` (`{emptyField?:
-'string' | 'null' | symbol, objectRows?: boolean}`), `Tab` (`{fields: FieldValue[], rows: FieldValue[][]}`),
-`RowObject` (`{[field: string]: FieldValue}`) and `ObjectTab` (`{fields: FieldValue[], rows: RowObject[]}`).
+The package exports the TypeScript types `FieldValue` (`string | null | symbol`), `EmptyField` (`'string' |
+'null' | 'both' | symbol`), `ColumnOptions` (`{emptyField?: EmptyField}`), `Options` (`{emptyField?: EmptyField,
+objectRows?: boolean, columnDefs?: {[field: string]: ColumnOptions}}`), `Tab` (`{fields: FieldValue[], rows:
+FieldValue[][]}`), `RowObject` (`{[field: string]: FieldValue}`) and `ObjectTab` (`{fields: FieldValue[], rows:
+RowObject[]}`).
 
 ## License
 
